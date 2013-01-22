@@ -1,0 +1,100 @@
+--[[local DailyHeroicCheckBox = AceGUI:Create("CheckBox")
+	DailyHeroicCheckBox:SetLabel("Daily Heroic Dungeon")
+	if DTD_Database.profile.dailyheroic then
+		DailyHeroicCheckBox:SetValue(DTD_Database.profile.dailyheroic)
+	end
+	DailyHeroicCheckBox:SetCallback("OnValueChanged", function() 
+															DTD_Database.profile.dailyheroic = DailyHeroicCheckBox:GetValue()
+															DTD:ReloadTrackingFrame()
+														end)
+	ScrollFrame:AddChild(DailyHeroicCheckBox)--]]
+	
+	--local ProfessionsGroup = AceGUI:Create("InlineGroup")
+	--ProfessionsGroup:SetTitle("Profession Dailies")
+	--ProfessionsGroup:SetLayout("Flow")
+	--ScrollFrame:AddChild(ProfessionsGroup)
+	--
+	----
+	---- DAILIES
+	----
+	--
+	--local ReputationGroup = AceGUI:Create("InlineGroup")
+	--ReputationGroup:SetTitle("Reputation")
+	--ReputationGroup:SetLayout("Flow")
+	--ScrollFrame:AddChild(ReputationGroup)
+	--
+	--local DescText = AceGUI:Create("Label")
+	--DescText:SetText("Check off each faction who's reputation daily quests you would like to be reminded to complete.")
+	--DescText:SetColor(0,1,0)
+	--ReputationGroup:AddChild(DescText)
+	--
+	---- Loop through the factions and create a checkbox for each
+	--local cbs = {}
+	--for i = 1, #(factions) do
+	--	if factions[i]["side"] ~= DTD_Database.profile.enemy then
+	--		--self:Print(factions[i]["name"])
+	--		--self:Print("Id: "..factions[i]["id"])
+	--		cbs["factionCB"..i] = AceGUI:Create("CheckBox")
+	--		cbs["factionCB"..i]:SetLabel(factions[i]["name"])
+	--		cbs["factionCB"..i]:SetFullWidth(true)
+	--		-- load the previous checkbox state
+	--		if DTD_Database.profile.factionsTracking[factions[i]["id"]] then
+	--			cbs["factionCB"..i]:SetValue(DTD_Database.profile.factionsTracking[factions[i]["id"]])
+	--		end
+	--		
+	--		-- Register toggle checkback
+	--		cbs["factionCB"..i]:SetCallback("OnValueChanged",function () 
+	--			--DTD_Database.profile.factionsTracking[i] = cbs["factionCB"..i]:GetValue()
+	--			DTD_Database.profile.factionsTracking[factions[i]["id"]] = cbs["factionCB"..i]:GetValue()
+	--			DTD:ReloadTrackingFrame()
+	--		end)
+	--		cbs["factionCB"..i]:SetCallback("OnEnter",function ()
+	--			GameTooltip:SetOwner(cbs["factionCB"..i].frame, "ANCHOR_CURSOR", 0, 0)
+	--			if factions[i]["side"] == DTD_Database.profile.friendly then
+	--				GameTooltip:AddLine(factions[i]["name"],0,1,0)
+	--				GameTooltip:AddLine(UnitFactionGroup("player"),1,1,1)
+	--			--elseif factions[i]["side"] == DTD_Database.profile.enemy then
+	--			--	GameTooltip:AddLine(factions[i]["name"],1,0,0)
+	--			--	GameTooltip:AddLine("Hostile",1,1,1)
+	--			else
+	--				GameTooltip:AddLine(factions[i]["name"])
+	--				GameTooltip:AddLine("Neutral",1,1,1)
+	--			end
+	--			GameTooltip:Show()
+	--		end)
+	--		
+	--		cbs["factionCB"..i]:SetCallback("OnLeave",function () GameTooltip:Hide() end)
+	--		
+	--		--if factions[i]["side"] then self:Print(factions[i]["name"].." is faction "..factions[i]["side"])
+	--		--else self:Print(factions[i]["name"].." is neutral")
+	--		--end			
+	--		
+	--		if factions[i]["category"] == 2 then						-- Veto if they do not have the appropriate profession
+	--			if factions[i]["category2"] == 2 then 		-- It's a cooking quest
+	--				ProfessionsGroup:AddChild(cbs["factionCB"..i])
+	--			end	
+	--			if factions[i]["category2"] == 1 then		-- It's a fishing quest
+	--				ProfessionsGroup:AddChild(cbs["factionCB"..i])
+	--			end
+	--			if factions[i]["category2"] == 3 then		-- It's a fishing quest
+	--				ProfessionsGroup:AddChild(cbs["factionCB"..i])
+	--			end
+	--		else
+	--			ReputationGroup:AddChild(cbs["factionCB"..i])
+	--		end
+	--	end
+	--end
+	--
+	--local RestoreLbl = AceGUI:Create("Label")
+	--RestoreLbl:SetText("Restore all quests that have been removed from the main tracking frame.")
+	--RestoreLbl:SetFullWidth(true)
+	--ScrollFrame:AddChild(RestoreLbl)
+	--
+	--local RestoreIgnoredBtn = AceGUI:Create("Button")
+	--RestoreIgnoredBtn:SetText("Restore quests")
+	--RestoreIgnoredBtn:SetFullWidth(true)
+	--RestoreIgnoredBtn:SetCallback("OnClick",function () 
+	--											DTD_Database.profile.dontTrack = {}
+	--											DTD:ReloadTrackingFrame()
+	--										end)
+	--ScrollFrame:AddChild(RestoreIgnoredBtn)

@@ -1,0 +1,132 @@
+---- Show/hide the minimap icon
+--	--local ShowMinimapCB = AceGUI:Create("CheckBox")
+--	--ShowMinimapCB:SetLabel("Show Minimap Icon")
+--	--ShowMinimapCB:SetValue(not DTD_Database.profile.minimapIcon['hide'])
+--	--ShowMinimapCB:SetCallback("OnValueChanged", 
+--	--									function()
+--	--											DTD_Database.profile.minimapIcon['hide'] = not ShowMinimapCB:GetValue()
+--	--											if DTD_Database.profile.minimapIcon['hide'] then
+--	--												DTD.LDBIcon:Hide("DTD")
+--	--											else
+--	--												DTD.LDBIcon:Show("DTD")
+--	--											end
+--	--									end)
+--	--container:AddChild(ShowMinimapCB)
+--	--
+--	--
+--	---- Show/hide the tracker frame
+--	--local ShowTrackerCB = AceGUI:Create("CheckBox")
+--	--ShowTrackerCB:SetLabel("Show Tracking Frame")
+--	--if DTD_Database.profile.showTrackingFrame then
+--	--	ShowTrackerCB:SetValue(DTD_Database.profile.showTrackingFrame)
+--	--end
+--	--ShowTrackerCB:SetCallback("OnValueChanged", 
+--	--									function() 
+--	--											DTD_Database.profile.showTrackingFrame = ShowTrackerCB:GetValue()
+--	--											if DTD_Database.profile.showTrackingFrame then
+--	--												DTD.TrackingFrame:Show()
+--	--											else
+--	--												DTD.TrackingFrame:Hide()
+--	--											end
+--	--									end)
+--	--container:AddChild(ShowTrackerCB)
+--	--
+--	---- Show/hide the rep bars
+--	--local ShowRepCB = AceGUI:Create("CheckBox")
+--	--ShowRepCB:SetLabel("Show Reputation in Headers")
+--	--if DTD_Database.profile.showRep then
+--	--	ShowRepCB:SetValue(DTD_Database.profile.showRep)
+--	--end
+--	--ShowRepCB:SetCallback("OnValueChanged", 
+--	--									function() 
+--	--											DTD_Database.profile.showRep = ShowRepCB:GetValue()
+--	--											DTD:ReloadTrackingFrame()
+--	--									end)
+--	--container:AddChild(ShowRepCB)
+--	--
+--	---- Lock/unlock the tracker frame
+--	--local LockTrackerCB = AceGUI:Create("CheckBox")
+--	--LockTrackerCB:SetLabel("Lock Tracking Frame")
+--	--if DTD_Database.profile.lockTrackingFrame then
+--	--	LockTrackerCB:SetValue(DTD_Database.profile.lockTrackingFrame)
+--	--end
+--	--LockTrackerCB:SetCallback("OnValueChanged", 
+--	--									function() 
+--	--											DTD_Database.profile.lockTrackingFrame = LockTrackerCB:GetValue()
+--	--											if DTD_Database.profile.lockTrackingFrame then
+--	--												DTD.TrackingFrame:SetMovable(false)
+--    --												DTD.TrackingFrame:EnableMouse(false)
+--    --											else
+--    --												DTD.TrackingFrame:SetMovable(true)
+--    --												DTD.TrackingFrame:EnableMouse(true)
+--    --											end
+--	--									end)
+--	--container:AddChild(LockTrackerCB)
+--	--
+--	----Hide inactive quests
+--	--local HideInactiveQuests = AceGUI:Create("CheckBox")
+--	--HideInactiveQuests:SetLabel("Hide Inactive Quests")
+--	--if DTD_Database.profile.hideInactiveQuests then
+--	--	HideInactiveQuests:SetValue(DTD_Database.profile.hideInactiveQuests)
+--	--end
+--	--HideInactiveQuests:SetCallback("OnValueChanged",
+--	--	function()
+--	--		DTD_Database.profile.hideInactiveQuests = HideInactiveQuests:GetValue()
+--	--		DTD:ReloadTrackingFrame()
+--	--    end)
+--	--container:AddChild(HideInactiveQuests)
+--
+	----Announce Quest Completion
+	--local AnnounceGroup = AceGUI:Create("InlineGroup")
+	--AnnounceGroup:SetTitle("Announce quest completion")
+	--AnnounceGroup:SetLayout("Flow")
+	--container:AddChild(AnnounceGroup)
+	--
+	--	-- Dropdown
+	--	local AnnounceQuestCompletionDD = AceGUI:Create("Dropdown")		
+	--	AnnounceQuestCompletionDD:SetLabel("Announce in:")
+	--	AnnounceQuestCompletionDD:SetList({[1] = "Blizzard Raid Warning"})
+	--	if IsAddOnLoaded("MikScrollingBattleText") then
+	--		AnnounceQuestCompletionDD:AddItem(2,"Mik's Scrolling Battle Text")
+	--		if MikSBT.IsModDisabled() then
+	--			AnnounceQuestCompletionDD:SetItemDisabled(2,1,true)
+	--			AnnounceQuestCompletionDD:SetValue(1)
+	--			DTD_Database.profile.announceMethod = 1
+	--		end
+	--	end
+	--	if IsAddOnLoaded("Parrot") then
+	--		AnnounceQuestCompletionDD:AddItem(3,"Parrot")
+	--	end
+	--	if IsAddOnLoaded("SCT") then
+	--		AnnounceQuestCompletionDD:AddItem(4,"Scrolling Combat Text")
+	--	end
+	--	AnnounceQuestCompletionDD:SetValue(DTD_Database.profile.announceMethod)
+	--	AnnounceQuestCompletionDD:SetDisabled(not DTD_Database.profile.announceQuestCompletion)
+	--	AnnounceQuestCompletionDD:SetCallback("OnValueChanged", function (_,_,value) 
+	--																DTD_Database.profile.announceMethod = value
+	--															end)
+	--	AnnounceGroup:AddChild(AnnounceQuestCompletionDD)
+	--	
+	--	-- Announce quest completion
+	--	local AnnounceQuestCompletionCB = AceGUI:Create("CheckBox")
+	--	AnnounceQuestCompletionCB:SetLabel("Enable")
+	--	AnnounceQuestCompletionCB:SetValue(DTD_Database.profile.announceQuestCompletion)
+	--	AnnounceQuestCompletionCB:SetCallback("OnValueChanged",function ()
+	--																DTD_Database.profile.announceQuestCompletion = AnnounceQuestCompletionCB:GetValue()
+	--																if DTD_Database.profile.announceQuestCompletion == true then
+	--																	AnnounceQuestCompletionDD:SetDisabled(false)
+	--																else
+	--																	AnnounceQuestCompletionDD:SetDisabled(true)
+	--																end
+	--															end)
+	--	AnnounceGroup:AddChild(AnnounceQuestCompletionCB)
+	--
+	---- Reset all data
+	--local ResetDataBtn = AceGUI:Create("Button")
+	--ResetDataBtn:SetText("Reset All Data")
+	--ResetDataBtn:SetCallback("OnClick", function()
+	--										container:ReleaseChildren()
+	--										DTD:DrawGroup2(container)
+	--										DTD:ResetData() 
+	--									end)
+	--container:AddChild(ResetDataBtn)

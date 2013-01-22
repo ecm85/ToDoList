@@ -1,0 +1,214 @@
+------
+	-------- TRACK OTHER DAILIES
+	--------
+    --for i = 1, #(factions) do    	
+	--	if DTD_Database.profile.factionsTracking[factions[i]["id"]] then	
+	--		local isFaction = false
+	--		
+	--		-- Get the faction info
+	--		local name, description, standingID, barMin, barMax, barValue, atWarWith, canToggleAtWar, isHeader, isCollapsed, hasRep, isWatched, isChild = GetFactionInfoByID(factions[i]["id"])
+	--		--if name == factions[i]["name"] then
+	--		if factions[i]["id"] > 20 then
+	--			isFaction = true
+	--			--print(factions[i]["name"].." = "..name)
+	--		end
+	--		
+	--		-- Create the Faction header and the expand/contract button
+	--		btns[i] = CreateFrame("Button",nil,DTD.TrackingFrame,"OptionsButtonTemplate")
+	--		if DTD_Database.profile.trackFactionsExpanded[factions[i]["id"]] then
+	--			btns[i]:SetText("-")
+	--		else
+	--			btns[i]:SetText("+")
+	--		end
+	--		btns[i]:SetWidth(10)
+	--		btns[i]:SetHeight(10)
+	--		btns[i]:SetAlpha(1)
+	--		btns[i]:SetPoint("TOPLEFT",DTD.TrackingFrame,"TOPLEFT",2,-ypos-2)
+	--		btns[i]:SetScript("OnClick",function ()
+	--										if DTD_Database.profile.trackFactionsExpanded[factions[i]["id"]] then
+	--											DTD_Database.profile.trackFactionsExpanded[factions[i]["id"]] = false
+	--											DTD:ReloadTrackingFrame()
+	--										else
+	--											DTD_Database.profile.trackFactionsExpanded[factions[i]["id"]] = true
+	--											DTD:ReloadTrackingFrame()
+	--										end
+	--									end)
+	--		btns[i]:Show()
+	--		
+	--		headers[i] = DTD.TrackingFrame:CreateFontString("header"..i,nil,"GameFontNormal")
+	--		if isFaction then
+	--			headers[i]:SetText(name)
+	--		else
+	--			headers[i]:SetText(factions[i]["name"])
+	--		end
+	--		headers[i]:SetPoint("TOPLEFT",DTD.TrackingFrame,"TOPLEFT",16,-ypos)
+	--		headers[i]:Show()
+	--		
+	--		if isFaction and DTD_Database.profile.showRep then
+	--			local repbar = CreateFrame("StatusBar", nil, DTD.TrackingFrame)
+	--			repbar:SetPoint("TOPLEFT", DTD.TrackingFrame, "TOPLEFT", 16, -ypos)
+	--			repbar:SetWidth(headers[i]:GetWidth()+12)
+	--			repbar:SetHeight(14)
+	--			repbar:SetStatusBarTexture("Interface\\Addons\\DailyTodos\\Textures\\Bar")
+	--			repbar:GetStatusBarTexture():SetHorizTile(false)
+	--			repbar:GetStatusBarTexture():SetVertTile(false)
+	--			repbar:SetStatusBarColor(FACTION_BAR_COLORS[standingID].r,FACTION_BAR_COLORS[standingID].g,FACTION_BAR_COLORS[standingID].b)
+	--			repbar:SetMinMaxValues(barMin,barMax)
+	--			repbar:SetValue(barValue)
+	--			
+	--			repbar.bg = repbar:CreateTexture(nil, "BACKGROUND")
+	--			repbar.bg:SetTexture("Interface\\Addons\\DailyTodos\\Textures\\Bar")
+	--			repbar.bg:SetAllPoints(true)
+	--			repbar.bg:SetVertexColor(0.35*FACTION_BAR_COLORS[standingID].r, 0.35*FACTION_BAR_COLORS[standingID].g, 0.35*FACTION_BAR_COLORS[standingID].b)
+	--			
+	--			repbar.value = repbar:CreateFontString(nil, nil,"GameFontNormal")
+	--			repbar.value:SetPoint("CENTER", repbar, "CENTER", 0, 0)
+	--			--repbar.value:SetFont("Fonts\\FRIZQT__.TTF", 9, "OUTLINE")
+	--			repbar.value:SetJustifyH("CENTER")
+	--			repbar.value:SetShadowOffset(1, -1)
+	--			repbar.value:SetTextColor(1, 1, 1)
+	--			repbar.value:SetText(name)
+	--			
+	--			repbar:SetScript("OnEnter",function ()
+	--											repbar.value:SetText((barValue-barMin).." / "..(barMax-barMin))
+	--										end)
+	--			repbar:SetScript("OnLeave",function () repbar.value:SetText(factions[i]["name"]) end)
+	--		end
+	--		
+	--		ypos = ypos+16
+	--		--	make sure the header is expanded
+	--		if DTD_Database.profile.trackFactionsExpanded[factions[i]["id"]] then
+	--			-- Detect a prof quest
+	--			if factions[i]["id"] < 8 then
+	--				local qCat = 0
+	--				if factions[i]["id"] < 4 then
+	--					qCat = 1
+	--				elseif factions[i]["id"] < 7 then
+	--					qCat = 3
+	--				elseif factions[i]["id"] == 7 then
+	--					qCat = 5
+	--				end
+	--				qCat = qCat + (DTD_Database.profile.friendly-1)
+	--				cat = factions[qCat]["id"]
+	--				--print(factions[qCat]["name"])
+	--			end
+	--			local cat = dailyQuests[factions[i]["id"]]
+    --			for n = 1, #(cat) do
+    --				local quest = dailyQuests[factions[i]["id"]][n]
+    --				-- If the quest is the right faction, or neutral and the quest is not one selected to be ignored and is not a holiday quest
+	--				if quest["side"] == DTD_Database.profile.friendly or quest["side"] == 3 then
+	--				if math.abs(quest["category"]) ~= 1008 and DTD_Database.profile.dontTrack[quest["id"]] ~= true then					
+	--					local level = quest["level"]
+	--					local color = "|cffFFFFFF"
+	--					
+	--					----
+	--					---- Create the little icon thingy
+	--					----
+	--					lblBtns[i.."-"..n] = CreateFrame("Button",nil,DTD.TrackingFrame)
+	--					lblBtns[i.."-"..n]:RegisterForClicks("LeftButtonUp","RightButtonUp")
+	--					local tx = lblBtns[i.."-"..n]:CreateTexture()
+	--					tx:SetAllPoints(lblBtns[i.."-"..n])
+	--					lblBtns[i.."-"..n]:SetBackdrop(tx)
+	--					lblBtns[i.."-"..n]:SetWidth(12)
+	--					lblBtns[i.."-"..n]:SetHeight(12)
+	--					lblBtns[i.."-"..n]:SetAlpha(1)
+	--					
+	--					if DTD_Database.profile.completedQuests[quest["id"]] then
+	--						tx:SetTexture(QUEST_COMPLETE,1)
+	--					elseif DTD_Database.profile.acceptedQuests[quest["id"]] then
+	--						tx:SetTexture(QUEST_ACCEPTED,1)
+	--					else
+	--						tx:SetTexture(QUEST_AVAILABLE,1)
+	--					end
+	--					
+	--					if DTD_Database.profile.completedQuests[quest["id"]] ~= true and DTD_Database.profile.acceptedQuests[quest["id"]] ~= true and DTD_Database.profile.hideInactiveQuests then
+	--					
+	--					else
+	--					
+	--					lblBtns[i.."-"..n]:SetPoint("TOPLEFT",DTD.TrackingFrame,"TOPLEFT",15,-ypos)
+	--					lblBtns[i.."-"..n]:Show()
+	--					
+	--					----
+	--					---- Create the label for the quest
+	--					----
+	--					
+	--					
+	--					lbls[i.."-"..n] = DTD.TrackingFrame:CreateFontString("quest"..n,nil,"GameFontNormalSmall")
+	--					if DTD_Database.profile.completedQuests[quest["id"]] then
+	--						color = "|cff00FF00"
+	--					end
+	--					
+	--					--Added to change the color to yellow when quest is accepted
+	--					if DTD_Database.profile.acceptedQuests[quest["id"]] and not DTD_Database.profile.completedQuests[quest["id"]] then
+	--						color ="|cffffff00"
+	--					end
+--
+--	--					-- Not a profession quest, so localize the name automatically
+--	--					if quest["id"] > 10 then
+--	--						quest["name"] = quest_names[quest["id"]] -- fix for Torhal's localization code. reload the data so it doesn't say "unknown"
+--	--						quest["name"] = quest_names[quest["id"]]
+--	--					end
+--	--					if level == nil then
+--	--						lbls[i.."-"..n]:SetText(color..quest["name"].."|r")
+--	--					else
+--	--						lbls[i.."-"..n]:SetText("|cff74BBFB["..quest["level"].."]|r "..color..quest["name"].."|r")
+--	--					end
+--	--					lbls[i.."-"..n]:SetPoint("TOPLEFT",DTD.TrackingFrame,"TOPLEFT",27,-ypos)
+--	--					lbls[i.."-"..n]:Show()
+--	--					
+--	--					----
+--	--					---- Create the invisible button so that the list items are clickable
+--	--					----
+--	--					
+--	--					lblBtns[i.."-"..n] = CreateFrame("Button",nil,DTD.TrackingFrame)
+--	--					lblBtns[i.."-"..n]:RegisterForClicks("LeftButtonUp","RightButtonUp")
+--	--					local tx = lblBtns[i.."-"..n]:CreateTexture()
+--	--					tx:SetAllPoints(lblBtns[i.."-"..n])
+--	--					tx:SetTexture(1,1,1,0.1)
+--	--					lblBtns[i.."-"..n]:SetHighlightTexture(tx)
+--	--					lblBtns[i.."-"..n]:SetWidth(lbls[i.."-"..n]:GetStringWidth())
+--	--					lblBtns[i.."-"..n]:SetHeight(12)
+--	--					lblBtns[i.."-"..n]:SetAlpha(1)
+--	--					lblBtns[i.."-"..n]:SetPoint("TOPLEFT",DTD.TrackingFrame,"TOPLEFT",27,-ypos)
+--	--					
+--	--					
+--	--					
+--	--					lblBtns[i.."-"..n]:SetScript("OnClick", function (_, button)
+--	--																if button == "RightButton" then
+--	--																	DTD_Database.profile.dontTrack[dailyQuests[factions[i]["id"]][n]["id"]] = true
+--	--																	DTD:ReloadTrackingFrame()
+--	--																else
+--	--																	if DTD_Database.profile.completedQuests[dailyQuests[factions[i]["id"]][n]["id"]] then
+--	--																		DTD_Database.profile.completedQuests[dailyQuests[factions[i]["id"]][n]["id"]] = false
+--	--																	else
+--	--																		DTD_Database.profile.completedQuests[dailyQuests[factions[i]["id"]][n]["id"]] = true
+--	--																	end
+--	--																	DTD_Database.global.completedQuests[CharacterName] = DTD_Database.profile.completedQuests
+--	--																	DTD:ReloadTrackingFrame()
+--	--																end
+--	--															end) 
+--	--					lblBtns[i.."-"..n]:SetScript("OnEnter", function ()
+--	--																if DTD_Tooltips then
+--	--																	DTD_Tooltips:CreateQuestTooltip(lblBtns[i.."-"..n],dailyQuests[factions[i]["id"]][n])
+--	--																end
+--	--															end)
+--	--					lblBtns[i.."-"..n]:SetScript("OnLeave", function ()
+--	--																if DTD_Tooltips then
+--	--																	QTip:Release(self.tooltip)
+--	--																	self.tooltip = nil
+--	--																	--GameTooltip:Hide()
+--	--																end
+--	--															end)
+--	--					lblBtns[i.."-"..n]:Show()
+--	--					
+--	--					ypos = ypos+12
+--	--				    end
+--	--				end
+--	--				end
+--	--			end
+--	--		end
+	--	end
+    --end
+    
+    -- Reposition after creating
+    --DTD.TrackingFrame:SetHeight(ypos+32) --Changed to keep the list in the same postition after it rebuilds
