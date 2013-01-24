@@ -33,6 +33,7 @@ local TDLLauncher = LibStub("LibDataBroker-1.1", true):NewDataObject("TDL", {
 local windowOpen = false
 local tab = 1
 local __ = requireUnderscore()
+local TaskList = requireTaskList()
 
 local ToDoList_UpdateInterval = 1.0
 local ToDoList_TimeSinceLastUpdate = 0.0
@@ -114,6 +115,11 @@ function TDL:OnInitialize()
     TDL_Database = LibStub("AceDB-3.0"):New("ToDoListDB",defaults)
     if (not TDL_Database.char.hasDefaults) then
 		TDL:SetUpDefaultCharValues()
+	end
+	if (TDL_Database.global.Tasks) then
+		TDL_Database.global.Tasks = TaskList.load(TDL_Database.global.Tasks)
+	else
+		TDL_Database.global.Tasks = TaskList:create()
 	end
     TDL:CreateMinimapButton()
     TDL:CreateTrackingFrame()
@@ -492,24 +498,8 @@ function TDL:EditMinutes(id, textBox)
 	self:Print("You tried to edit id #"..tostring(id))
 end
 
-function TDL:FindTaskIndex(id)
-	for k,v in pairs(TDL_Database.global.Tasks) do
-		if v["id"] == id then
-			return k
-		end
-	end
-	return -1
-end
-
---TODO
 function TDL:DeleteTask(id)
-	local indexToDelete = TDL:FindTaskIndex(id)
-	local numTasks = #TDL_Database.global.Tasks
-	for i=indexToDelete, numTasks - 1 do
-		TDL_Database.global.Tasks[i] = TDL_Database.global.Tasks[i+1]
-	end
-	TDL_Database.global.Tasks[numTasks] = nil
-	TDL_Database.global.nextId = TDL_Database.global.nextId - 1
+	TDL_Database.global.Tasks:Remove(id)
 end
 
 function TDL:AddTask()
@@ -517,12 +507,7 @@ function TDL:AddTask()
 	if (not result) then
 		return
 	end
-	if (not TDL_Database.global.Tasks or not TDL_Database.global.nextId or not TDL_Database.global.nextIndex) then
-		TDL_Database.global.Tasks = {}
-		TDL_Database.global.nextId = 1
-		TDL_Database.global.nextIndex = 1
-	end
-	TDL_Database.global.Tasks[TDL_Database.global.nextIndex] =
+	TDL_Database.global.Tasks:Add
 	{
 		["Character"] = TDL_UncreatedChanges["Character"],
 		["Description"] = TDL_UncreatedChanges["Description"],
@@ -540,11 +525,7 @@ function TDL:AddTask()
 		["Minutes"] = TDL_UncreatedChanges["Minutes"],
 		["AmPm"] = TDL_UncreatedChanges["AmPm"],
 		["LastCompleted"] = nil,
-		["id"] = TDL_Database.global.nextId
 	}
-
-	TDL_Database.global.nextId = TDL_Database.global.nextId + 1
-	TDL_Database.global.nextIndex = TDL_Database.global.nextIndex + 1
 
 end
 
@@ -644,26 +625,16 @@ function TDL:GetDailyResetTimeNoteGroup()
 end
 
 function TDL:GetRemainingTasks()
-	if (not TDL_Database.global.Tasks or #TDL_Database.global.Tasks == 0) then
-		return {}
-	end
-	return __.select(TDL_Database.global.Tasks, function(task) return not task["LastCompleted"] end)
+	return __.select(TDL_Database.global.Tasks:ToArray(), function(task) return not task["LastCompleted"] end)
 end
 
 function TDL:GetCompletedTasks()
-	if (not TDL_Database.global.Tasks or #TDL_Database.global.Tasks == 0) then
-		return {}
-	end
-	return __.select(TDL_Database.global.Tasks, function(task) return task["LastCompleted"] end)
+	return __.select(TDL_Database.global.Tasks:ToArray(), function(task) return task["LastCompleted"] end)
 end
 
 --TODO
 function TDL:GetAllTasks()
-	toReturn = {}
-	if (not TDL_Database.global.Tasks or #TDL_Database.global.Tasks == 0) then
-		return toReturn
-	end
-	return TDL_Database.global.Tasks
+	return TDL_Database.global.Tasks:ToArray()
 end
 
 --TODO
