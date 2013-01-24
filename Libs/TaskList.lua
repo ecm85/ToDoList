@@ -45,9 +45,7 @@ function requireTaskList()
 		if (indexToRemove == -1) then
 			return false
 		end
-		for i = indexToRemove, self.count do
-			self.items[i] = self.items[i + 1]
-		end
+		table.Remove(indexToRemove)
 		self.count = self.count - 1
 		return true
 	end
