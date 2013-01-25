@@ -29,6 +29,54 @@ local TDLLauncher = LibStub("LibDataBroker-1.1", true):NewDataObject("TDL", {
 		end,
 	})
 
+function TDL:CreateLabel(text, width)
+	local label = AceGUI:Create("Label")
+	label:SetText(text)
+	label:SetWidth(width)
+	return label
+end
+
+function TDL:CreateButton(text, width, cb)
+	local button = AceGUI:Create("Button")
+	button:SetText(text)
+	button:SetWidth(width)
+	button:SetCallback("OnClick", cb)
+	return button
+end
+
+function TDL:CreateTextBox(text, width, cbMethod, cb, buttonDisabled)
+	local textBox = AceGUI:Create("EditBox")
+	textBox:SetText(text)
+	textBox:SetWidth(width)
+	textBox:SetCallback(cbMethod, cb)
+	textBox:DisableButton(buttonDisabled)
+
+	return textBox
+end
+
+function TDL:CreateCheckbox(text, width, defaultValue, cb)
+	local checkbox = AceGUI:Create("CheckBox")
+	checkbox:SetLabel(text)
+	checkbox:SetWidth(width)
+	checkbox:SetValue(defaultValue)
+	checkbox:SetCallback("OnValueChanged", cb)
+	return checkbox
+end
+
+function TDL:CreateDropdown(values, width, cb)
+	local dropDown = AceGUI:Create("Dropdown")
+	dropDown:SetList(values)
+	dropDown:SetWidth(width)
+	dropDown:SetCallback("OnValueChanged", cb)
+	return dropDown
+end
+
+function TDL:CreateColoredLabel (text, width, colorArg1, colorArg2, colorArg3)
+	local label = TDL:CreateLabel(text, width)
+	label:SetColor(colorArg1, colorArg2, colorArg3)
+	return label
+end
+
 
 local windowOpen = false
 local tab = 1
@@ -80,6 +128,49 @@ local TDL_AmPmLiterals =
 	[2] = "PM"
 }
 
+---------------------------------------------------------------------------------
+--Time zone helpers
+
+-- Compute the difference in seconds between local time and UTC.
+local function get_timezone()
+  local now = time()
+  return difftime(now, time(date("!*t", now)))
+end
+
+-- Return a timezone string in ISO 8601:2000 standard form (+hhmm or -hhmm)
+local function get_tzoffset(timezone)
+  local h, m = math.modf(timezone / 3600)
+  return h, 60 * m
+end
+
+-- return the timezone offset in seconds, as it was on the time given by ts
+local function get_timezone_offset(ts)
+	local utcdate   = date("!*t", ts)
+	local localdate = date("*t", ts)
+	localdate.isdst = false -- this is the trick
+	return difftime(time(localdate), time(utcdate))
+end
+
+local function CurrentTimeZoneString()
+	timezoneDiff = get_timezone_offset(time())
+	hourDiff, minuteDiff = get_tzoffset(timezoneDiff)
+	minuteDiff = math.abs(minuteDiff)
+	timeZoneStrings =
+	{
+		[-8] = "Pacific",
+		[-7] = "Mountain",
+		[-6] = "Central",
+		[-5] = "Eastern"
+	}
+	local returnString = ""
+	if minuteDiff == 0 and timeZoneStrings[hourDiff] then
+		returnString = returnString..timeZoneStrings[hourDiff]
+	end
+	returnString = returnString.." "..string.format("%+.2d", hourDiff)..":"..string.format("%.2d", minuteDiff).." UTC"
+	return returnString
+end
+
+--------------------------------------------------------------------------
 
 TDL:RegisterChatCommand("tdl","InitUI")
 TDL:RegisterChatCommand("todo","InitUI")
@@ -108,6 +199,26 @@ function TDL:SetUpDefaultCharValues()
 	}
 end
 
+function TDL:InitializeUncreatedChanges()
+	TDL_UncreatedChanges =
+	{
+		["Character"] = "",
+		["Description"] = "",
+		["Days"] =
+		{
+			[1] = true,
+			[2] = true,
+			[3] = true,
+			[4] = true,
+			[5] = true,
+			[6] = true,
+			[7] = true
+		},
+		["Hours"] = -1,
+		["Minutes"] = -1,
+		["AmPm"] = 0
+	}
+end
 
 function TDL:OnInitialize()
     -- Called when the addon is loaded
@@ -115,7 +226,7 @@ function TDL:OnInitialize()
     if (not TDL_Database.char.hasDefaults) then
 		TDL:SetUpDefaultCharValues()
 	end
-	if (TDL_Database.global.Tasks) then
+	if (not TDL_Database.global.Tasks) then
 		TDL_Database.global.Tasks = {}
 		TDL_Database.global.nextId = 0
 	end
@@ -123,58 +234,13 @@ function TDL:OnInitialize()
     TDL:CreateTrackingFrame()
 end
 
--- Compute the difference in seconds between local time and UTC.
-local function get_timezone()
-  local now = time()
-  return difftime(now, time(date("!*t", now)))
-end
-
--- Return a timezone string in ISO 8601:2000 standard form (+hhmm or -hhmm)
-local function get_tzoffset(timezone)
-  local h, m = math.modf(timezone / 3600)
-  return h, 60 * m
-end
-
--- return the timezone offset in seconds, as it was on the time given by ts
-local function get_timezone_offset(ts)
-	local utcdate   = date("!*t", ts)
-	local localdate = date("*t", ts)
-	localdate.isdst = false -- this is the trick
-	return difftime(time(localdate), time(utcdate))
-end
-
-function TDL:CurrentTimeZoneString()
-	timezoneDiff = get_timezone_offset(time())
-	hourDiff, minuteDiff = get_tzoffset(timezoneDiff)
-	minuteDiff = math.abs(minuteDiff)
-	timeZoneStrings =
-	{
-		[-8] = "Pacific",
-		[-7] = "Mountain",
-		[-6] = "Central",
-		[-5] = "Eastern"
-	}
-	local returnString = ""
-	if minuteDiff == 0 and timeZoneStrings[hourDiff] then
-		returnString = returnString..timeZoneStrings[hourDiff]
-	end
-	returnString = returnString.." "..string.format("%+.2d", hourDiff)..":"..string.format("%.2d", minuteDiff).." UTC"
-	return returnString
-end
-
-
 function TDL:OnEnable()
 	-- Called when the addon is enabled
 	self:Print("To-Do List enabled. /todo to configure.")
 	TDL:ReloadTrackingFrame()
 end
 
--- Objective selection tab
 function TDL:DrawTaskTab(container)
-	-- Draw the settings
-	--
-	-- PROFESSION QUESTS
-	--
 	container:SetLayout("Fill")
 
 	local ScrollFrame = AceGUI:Create("ScrollFrame")
@@ -191,7 +257,6 @@ function TDL:DrawTaskTab(container)
 	container:AddChild(ScrollFrame)
 end
 
--- Options and settings tab
 function TDL:DrawAddRemoveTab(container)
 	container:SetLayout("Fill")
 
@@ -212,54 +277,6 @@ function TDL:DrawAddRemoveTab(container)
 	container:AddChild(ScrollFrame)
 end
 
-function TDL:CreateLabel(text, width)
-	local label = AceGUI:Create("Label")
-	label:SetText(text)
-	label:SetWidth(width)
-	return label
-end
-
-function TDL:CreateButton(text, width, cb)
-	local button = AceGUI:Create("Button")
-	button:SetText(text)
-	button:SetWidth(width)
-	button:SetCallback("OnClick", cb)
-	return button
-end
-
-function TDL:CreateTextBox(text, width, cbMethod, cb, buttonDisabled)
-	local textBox = AceGUI:Create("EditBox")
-	textBox:SetText(text)
-	textBox:SetWidth(width)
-	textBox:SetCallback(cbMethod, cb)
-	textBox:DisableButton(buttonDisabled)
-
-	return textBox
-end
-
-function TDL:CreateCheckbox(text, width, defaultValue, cb)
-	local checkbox = AceGUI:Create("CheckBox")
-	checkbox:SetLabel(text)
-	checkbox:SetWidth(width)
-	checkbox:SetValue(defaultValue)
-	checkbox:SetCallback("OnValueChanged", cb)
-	return checkbox
-end
-
-function TDL:CreateDropdown(values, width, cb)
-	local dropDown = AceGUI:Create("Dropdown")
-	dropDown:SetList(values)
-	dropDown:SetWidth(width)
-	dropDown:SetCallback("OnValueChanged", cb)
-	return dropDown
-end
-
-function TDL:CreateColoredLabel (text, width, colorArg1, colorArg2, colorArg3)
-	local label = TDL:CreateLabel(text, width)
-	label:SetColor(colorArg1, colorArg2, colorArg3)
-	return label
-end
-
 function TDL:GetRemainingTasksGroup()
 	local RemainingTasksGroup = AceGUI:Create("InlineGroup")
 	RemainingTasksGroup:SetWidth(ToDoList_TaskPage_PageWidth)
@@ -276,7 +293,6 @@ function TDL:GetRemainingTasksGroup()
 
 	local remainingTasks = TDL:GetRemainingTasks()
 	for i, task in ipairs(remainingTasks) do
-		local task = remainingTasks[i]
 		local characterLabel = TDL:CreateLabel(task["Character"], ToDoList_TaskPage_CharacterColumnWidth)
 		local taskLabel = TDL:CreateLabel(task["Description"], ToDoList_TaskPage_DescriptionColumnWidth)
 		local expirationGroup = AceGUI:Create("SimpleGroup")
@@ -299,24 +315,6 @@ function TDL:GetRemainingTasksGroup()
 	return RemainingTasksGroup
 end
 
-function TDL:GetExpirationDaysString(days)
-	local toReturn = ""
-	for i, day in ipairs(days) do
-		day = days[i]
-		if (day) then
-			if (toReturn ~= "") then
-				toReturn = toReturn.." "
-			end
-			toReturn = toReturn..TDL_DayInitials[i]
-		end
-	end
-	return toReturn
-end
-
-function TDL:GetExpirationTimeString(hours, minutes, ampm)
-	return string.format("%.2d", hours)..":"..string.format("%.2d", minutes).." "..TDL_AmPmLiterals[ampm]
-end
-
 function TDL:GetCompletedTasksGroup()
 	local CompletedTasksGroup = AceGUI:Create("InlineGroup")
 	CompletedTasksGroup:SetWidth(ToDoList_TaskPage_PageWidth)
@@ -334,7 +332,6 @@ function TDL:GetCompletedTasksGroup()
 
 	local completedTasks = TDL:GetCompletedTasks()
 	for i, task in ipairs(completedTasks) do
-		local task = completedTasks[i]
 		local taskLabel = AceGUI:Create("Label")
 		local characterLabel = TDL:CreateLabel(task["Character"], ToDoList_TaskPage_CharacterColumnWidth)
 		local taskLabel = TDL:CreateLabel(task["Description"], ToDoList_TaskPage_DescriptionColumnWidth)
@@ -346,6 +343,86 @@ function TDL:GetCompletedTasksGroup()
 		CompletedTasksGroup:AddChild(blankLabel)
 	end
 	return CompletedTasksGroup
+end
+
+
+function TDL:GetExistingTasksGroup()
+	local ExistingTasksGroup = AceGUI:Create("InlineGroup")
+	ExistingTasksGroup:SetWidth(ToDoList_EditPage_PageWidth)
+	ExistingTasksGroup:SetTitle("Existing Tasks")
+
+	local CharacterLabel = TDL:CreateColoredLabel("Character", ToDoList_EditPage_CharacterColumnWidth, 0, 1, 0)
+	local DescriptionLabel = TDL:CreateColoredLabel("Description", ToDoList_EditPage_DescriptionColumnWidth, 0, 1, 0)
+	local ExpirationLabel = TDL:CreateColoredLabel("Reminder day/time", ToDoList_EditPage_DateTimeColumnWidth, 0, 1, 0)
+	ExistingTasksGroup:AddChild(CharacterLabel)
+	ExistingTasksGroup:AddChild(DescriptionLabel)
+	ExistingTasksGroup:AddChild(ExpirationLabel)
+
+	local existingTasks = TDL:GetAllTasks()
+	for i, task in ipairs(existingTasks) do
+		local characterTextBox = TDL:CreateTextBox(
+			task["Character"],
+			ToDoList_EditPage_CharacterColumnWidth,
+			"OnTextChanged",
+			function (textBox) TDL:EditCharacter(task, textBox) end,
+			true)
+		local descriptionTextBox = TDL:CreateTextBox(
+			task["Description"],
+			ToDoList_EditPage_DescriptionColumnWidth,
+			"OnTextChanged",
+			function (textBox) TDL:EditDescription(task, textbox) end,
+			true)
+		ExistingTasksGroup:AddChild(characterTextBox)
+		ExistingTasksGroup:AddChild(descriptionTextBox)
+
+		local checkboxGroup = AceGUI:Create("SimpleGroup")
+		checkboxGroup:SetLayout("Flow")
+		checkboxGroup:SetWidth(ToDoList_EditPage_CheckboxGroupWidth)
+		for i, dayIntial in ipairs(TDL_DayInitials) do
+			local checkbox = TDL:CreateCheckbox(
+				dayInitial,
+				ToDoList_EditPage_DayCheckboxWidth,
+				task["Days"][i],
+				function(checkBox) TDL:EditDayNotification(task, i, checkBox) end)
+			checkboxGroup:AddChild(checkbox)
+		end
+		ExistingTasksGroup:AddChild(checkboxGroup)
+		local HoursTextbox = TDL:CreateTextBox(
+			task["Hours"],
+			ToDoList_EditPage_HourTextboxWidth,
+			"OnTextChanged",
+			function (textBox) TDL:EditHours(task, textBox) end,
+			true)
+		HoursTextbox:SetMaxLetters(2)
+		local MinutesTextBox = TDL:CreateTextBox(
+			string.format("%.2d", task["Minutes"]),
+			ToDoList_EditPage_MinutesTextboxWidth,
+			"OnTextChanged",
+			function (textBox) TDL:EditMinutes(task, textBox) end,
+			true)
+		MinutesTextBox:SetMaxLetters(2)
+		local AmPmDropdown = TDL:CreateDropdown(TDL_AmPmLiterals,
+			ToDoList_EditPage_AmPmDropdownWidth,
+			function(combobox) TDL:EditAmPm(task, combobox) end)
+		AmPmDropdown:SetValue(task["AmPm"])
+		local colonLabel = TDL:CreateLabel(":", ToDoList_EditPage_ColonLabelWidth)
+
+		ExistingTasksGroup:AddChild(HoursTextbox)
+		ExistingTasksGroup:AddChild(colonLabel)
+		ExistingTasksGroup:AddChild(MinutesTextBox)
+		ExistingTasksGroup:AddChild(AmPmDropdown)
+
+		local DeleteTaskButton = TDL:CreateButton(
+		"Delete Task",
+		ToDoList_TaskPage_ButtonWidth,
+		function() TDL:DeleteTask(task["id"]) end)
+		ExistingTasksGroup:AddChild(DeleteTaskButton)
+		local blankLabel = TDL:CreateLabel("", ToDoList_EditPage_ButtonExtenderWidth)
+		ExistingTasksGroup:AddChild(blankLabel)
+
+	end
+
+	return ExistingTasksGroup
 end
 
 function TDL:GetAddTaskGroup()
@@ -421,25 +498,12 @@ function TDL:GetAddTaskGroup()
 	return AddTaskGroup
 end
 
-function TDL:InitializeUncreatedChanges()
-	TDL_UncreatedChanges =
-	{
-		["Character"] = "",
-		["Description"] = "",
-		["Days"] =
-		{
-			[1] = true,
-			[2] = true,
-			[3] = true,
-			[4] = true,
-			[5] = true,
-			[6] = true,
-			[7] = true
-		},
-		["Hours"] = -1,
-		["Minutes"] = -1,
-		["AmPm"] = 0
-	}
+function TDL:GetDailyResetTimeNoteGroup()
+	local DailyResetTimeNoteGroup = AceGUI:Create("SimpleGroup")
+	local dailyResetTimeNoteText = "Note: The daily reset time for US servers is 3AM, Pacific Time, -08:00 UTC. All times entered will be in your current time zone, which is "..CurrentTimeZoneString().."."
+	local dailyResetTimeNote = TDL:CreateLabel(dailyResetTimeNoteText, ToDoList_EditPage_DailyResetNoteWidth)
+	DailyResetTimeNoteGroup:AddChild(dailyResetTimeNote)
+	return DailyResetTimeNoteGroup
 end
 
 function TDL:SetUncreatedCharacter(textBox)
@@ -467,32 +531,32 @@ function TDL:SetUncreatedMinutes(textBox)
 end
 
 --todo
-function TDL:EditCharacter(id, textBox)
+function TDL:EditCharacter(task, textBox)
+	task["Character"] = textBox:GetText()
+end
+
+--todo
+function TDL:EditDescription(task, textBox)
 	self:Print("You tried to edit id #"..tostring(id))
 end
 
 --todo
-function TDL:EditDescription(id, textBox)
+function TDL:EditDayNotification(task, index, checkbox)
 	self:Print("You tried to edit id #"..tostring(id))
 end
 
 --todo
-function TDL:EditDayNotification(id, index, checkbox)
+function TDL:EditAmPm(task, dropdown)
 	self:Print("You tried to edit id #"..tostring(id))
 end
 
 --todo
-function TDL:EditAmPm(id, dropdown)
+function TDL:EditHours(task, textBox)
 	self:Print("You tried to edit id #"..tostring(id))
 end
 
 --todo
-function TDL:EditHours(id, textBox)
-	self:Print("You tried to edit id #"..tostring(id))
-end
-
---todo
-function TDL:EditMinutes(id, textBox)
+function TDL:EditMinutes(task, textBox)
 	self:Print("You tried to edit id #"..tostring(id))
 end
 
@@ -533,96 +597,6 @@ function TDL:ValidateNewTask()
 	return true
 end
 
-
---TODO
-function TDL:GetExistingTasksGroup()
-	local ExistingTasksGroup = AceGUI:Create("InlineGroup")
-	ExistingTasksGroup:SetWidth(ToDoList_EditPage_PageWidth)
-	ExistingTasksGroup:SetTitle("Existing Tasks")
-
-	local CharacterLabel = TDL:CreateColoredLabel("Character", ToDoList_EditPage_CharacterColumnWidth, 0, 1, 0)
-	local DescriptionLabel = TDL:CreateColoredLabel("Description", ToDoList_EditPage_DescriptionColumnWidth, 0, 1, 0)
-	local ExpirationLabel = TDL:CreateColoredLabel("Reminder day/time", ToDoList_EditPage_DateTimeColumnWidth, 0, 1, 0)
-	ExistingTasksGroup:AddChild(CharacterLabel)
-	ExistingTasksGroup:AddChild(DescriptionLabel)
-	ExistingTasksGroup:AddChild(ExpirationLabel)
-
-	local existingTasks = TDL:GetAllTasks()
-	for i, task in ipairs(existingTasks) do
-		local task = existingTasks[i]
-		local characterTextBox = TDL:CreateTextBox(
-			task["Character"],
-			ToDoList_EditPage_CharacterColumnWidth,
-			"OnTextChanged",
-			function (textBox) TDL:EditCharacter(task, textBox) end,
-			true)
-		local descriptionTextBox = TDL:CreateTextBox(
-			task["Description"],
-			ToDoList_EditPage_DescriptionColumnWidth,
-			"OnTextChanged",
-			function (textBox) TDL:EditDescription(task, textbox) end,
-			true)
-		ExistingTasksGroup:AddChild(characterTextBox)
-		ExistingTasksGroup:AddChild(descriptionTextBox)
-
-		local checkboxGroup = AceGUI:Create("SimpleGroup")
-		checkboxGroup:SetLayout("Flow")
-		checkboxGroup:SetWidth(ToDoList_EditPage_CheckboxGroupWidth)
-		for i, dayIntial in ipairs(TDL_DayInitials) do
-			local checkbox = TDL:CreateCheckbox(
-				dayInitial,
-				ToDoList_EditPage_DayCheckboxWidth,
-				task["Days"][i],
-				function(checkBox) TDL:EditDayNotification(task, i, checkBox) end)
-			checkboxGroup:AddChild(checkbox)
-		end
-		ExistingTasksGroup:AddChild(checkboxGroup)
-		local HoursTextbox = TDL:CreateTextBox(
-			task["Hours"],
-			ToDoList_EditPage_HourTextboxWidth,
-			"OnTextChanged",
-			function (textBox) TDL:EditHours(task, textBox) end,
-			true)
-		HoursTextbox:SetMaxLetters(2)
-		local MinutesTextBox = TDL:CreateTextBox(
-			string.format("%.2d", task["Minutes"]),
-			ToDoList_EditPage_MinutesTextboxWidth,
-			"OnTextChanged",
-			function (textBox) TDL:EditMinutes(task, textBox) end,
-			true)
-		MinutesTextBox:SetMaxLetters(2)
-		local AmPmDropdown = TDL:CreateDropdown(TDL_AmPmLiterals,
-			ToDoList_EditPage_AmPmDropdownWidth,
-			function(combobox) TDL:EditAmPm(task, combobox) end)
-		AmPmDropdown:SetValue(task["AmPm"])
-		local colonLabel = TDL:CreateLabel(":", ToDoList_EditPage_ColonLabelWidth)
-
-		ExistingTasksGroup:AddChild(HoursTextbox)
-		ExistingTasksGroup:AddChild(colonLabel)
-		ExistingTasksGroup:AddChild(MinutesTextBox)
-		ExistingTasksGroup:AddChild(AmPmDropdown)
-
-		local DeleteTaskButton = TDL:CreateButton(
-		"Delete Task",
-		ToDoList_TaskPage_ButtonWidth,
-		function() TDL:DeleteTask(task["id"]) end)
-		ExistingTasksGroup:AddChild(DeleteTaskButton)
-		local blankLabel = TDL:CreateLabel("", ToDoList_EditPage_ButtonExtenderWidth)
-		ExistingTasksGroup:AddChild(blankLabel)
-
-	end
-
-	return ExistingTasksGroup
-end
-
-function TDL:GetDailyResetTimeNoteGroup()
-	local DailyResetTimeNoteGroup = AceGUI:Create("SimpleGroup")
-	local dailyResetTimeNoteText = "Note: The daily reset time for US servers is 3AM, Pacific Time, -08:00 UTC. All times entered will be in your current time zone, which is "..TDL:CurrentTimeZoneString().."."
-	local dailyResetTimeNote = TDL:CreateLabel(dailyResetTimeNoteText, ToDoList_EditPage_DailyResetNoteWidth)
-	DailyResetTimeNoteGroup:AddChild(dailyResetTimeNote)
-	return DailyResetTimeNoteGroup
-end
-
 function TDL:GetRemainingTasks()
 	return __.select(TDL_Database.global.Tasks, function(task) return not task["LastCompleted"] end)
 end
@@ -646,29 +620,7 @@ function TDL:SetTaskCompleted (task)
 	TDL:SafelyPrintVariable(task)
 end
 
---breaks if tables are keys to other tables, but not if tables are values in other tables
-function TDL:SafelyPrintVariable(var)
-	if (type(var) == "table") then
-		TDL:SafelyPrintTable(var, 0)
-	else
-		self:Print(var)
-	end
-end
 
-function TDL:SafelyPrintTable(var, indentation)
-	for k,v in pairs(var) do
-		local prefix = ""
-		for i=0,indentation do
-			prefix = prefix.." "
-		end
-		if (type(v) == "table") then
-			self:Print(prefix..tostring(k))
-			TDL:SafelyPrintTable(v, indentation + 1)
-		else
-			self:Print(prefix..tostring(k).." "..tostring(v))
-		end
-	end
-end
 
 local function SelectGroup(container,event,group)
 	container:ReleaseChildren()
@@ -698,6 +650,7 @@ function TDL:InitUI()
 	TDL.MainWindow:SetHeight("400")
 	TDL.MainWindow:SetLayout("Fill")
 	TDL.MainWindow:EnableResize(false)
+
 
 	TabGroup = AceGUI:Create("TabGroup")
 	TabGroup:SetTabs({{value = "tab1",text="To-Do List"}, {value = "tab2",text="Add/Remove To-Do's"}})
@@ -842,4 +795,46 @@ function TDL_OnUpdate(self, elapsed)
     ToDoList_TimeSinceLastUpdate = 0;
   end
 
+end
+
+function TDL:GetExpirationDaysString(days)
+	local toReturn = ""
+	for i, day in ipairs(days) do
+		day = days[i]
+		if (day) then
+			if (toReturn ~= "") then
+				toReturn = toReturn.." "
+			end
+			toReturn = toReturn..TDL_DayInitials[i]
+		end
+	end
+	return toReturn
+end
+
+function TDL:GetExpirationTimeString(hours, minutes, ampm)
+	return string.format("%.2d", hours)..":"..string.format("%.2d", minutes).." "..TDL_AmPmLiterals[ampm]
+end
+
+--breaks if tables are keys to other tables, but not if tables are values in other tables
+function TDL:SafelyPrintVariable(var)
+	if (type(var) == "table") then
+		TDL:SafelyPrintTable(var, 0)
+	else
+		self:Print(var)
+	end
+end
+
+function TDL:SafelyPrintTable(var, indentation)
+	for k,v in pairs(var) do
+		local prefix = ""
+		for i=0,indentation do
+			prefix = prefix.." "
+		end
+		if (type(v) == "table") then
+			self:Print(prefix..tostring(k))
+			TDL:SafelyPrintTable(v, indentation + 1)
+		else
+			self:Print(prefix..tostring(k).." "..tostring(v))
+		end
+	end
 end
