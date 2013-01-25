@@ -13,16 +13,6 @@ function requireTaskList()
 		return list
 	end
 
-	--loads an existing list into this list
-	function TaskList.load(taskList)
-		local list = {}
-		setmetatable(list, TaskList)
-		list.count = taskList.count
-		list.nextId = taskList.nextId
-		list.items = taskList.items
-		return list
-	end
-
 	function TaskList:Add(newItem)
 		newItem.id = self.nextId
 		self.nextId = self.nextId + 1
@@ -59,5 +49,5 @@ function requireTaskList()
 	end
 
 
-	return TaskList.create()
+	return TaskList
 end

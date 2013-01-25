@@ -33,7 +33,6 @@ local TDLLauncher = LibStub("LibDataBroker-1.1", true):NewDataObject("TDL", {
 local windowOpen = false
 local tab = 1
 local __ = requireUnderscore()
-local TaskList = requireTaskList()
 
 local ToDoList_UpdateInterval = 1.0
 local ToDoList_TimeSinceLastUpdate = 0.0
@@ -117,9 +116,8 @@ function TDL:OnInitialize()
 		TDL:SetUpDefaultCharValues()
 	end
 	if (TDL_Database.global.Tasks) then
-		TDL_Database.global.Tasks = TaskList.load(TDL_Database.global.Tasks)
-	else
-		TDL_Database.global.Tasks = TaskList:create()
+		TDL_Database.global.Tasks = {}
+		TDL_Database.global.nextId = 0
 	end
     TDL:CreateMinimapButton()
     TDL:CreateTrackingFrame()
@@ -277,7 +275,7 @@ function TDL:GetRemainingTasksGroup()
 	RemainingTasksGroup:AddChild(ButtonLabel)
 
 	local remainingTasks = TDL:GetRemainingTasks()
-	for i=1, #remainingTasks  do
+	for i, task in ipairs(remainingTasks) do
 		local task = remainingTasks[i]
 		local characterLabel = TDL:CreateLabel(task["Character"], ToDoList_TaskPage_CharacterColumnWidth)
 		local taskLabel = TDL:CreateLabel(task["Description"], ToDoList_TaskPage_DescriptionColumnWidth)
@@ -303,7 +301,7 @@ end
 
 function TDL:GetExpirationDaysString(days)
 	local toReturn = ""
-	for i = 1, #days do
+	for i, day in ipairs(days) do
 		day = days[i]
 		if (day) then
 			if (toReturn ~= "") then
@@ -335,7 +333,7 @@ function TDL:GetCompletedTasksGroup()
 
 
 	local completedTasks = TDL:GetCompletedTasks()
-	for i=1, #completedTasks  do
+	for i, task in ipairs(completedTasks) do
 		local task = completedTasks[i]
 		local taskLabel = AceGUI:Create("Label")
 		local characterLabel = TDL:CreateLabel(task["Character"], ToDoList_TaskPage_CharacterColumnWidth)
@@ -381,9 +379,9 @@ function TDL:GetAddTaskGroup()
 	local checkboxGroup = AceGUI:Create("SimpleGroup")
 	checkboxGroup:SetLayout("Flow")
 	checkboxGroup:SetWidth(ToDoList_EditPage_CheckboxGroupWidth)
-	for i=1,7 do
+	for i, dayInitial in ipairs(TDL_DayInitials) do
 		local checkbox = TDL:CreateCheckbox(
-			TDL_DayInitials[i],
+			dayInitial,
 			ToDoList_EditPage_DayCheckboxWidth,
 			true,
 			function(checkbox) TDL:SetUncreatedDayNotification(i, checkbox) end)
@@ -499,7 +497,7 @@ function TDL:EditMinutes(id, textBox)
 end
 
 function TDL:DeleteTask(id)
-	TDL_Database.global.Tasks:Remove(id)
+	TDL_Database.global.Tasks = _.reject(TDL_Datbase.global.Tasks, function (task) return task["id"] == id end)
 end
 
 function TDL:AddTask()
@@ -507,7 +505,7 @@ function TDL:AddTask()
 	if (not result) then
 		return
 	end
-	TDL_Database.global.Tasks:Add
+	table.insert(TDL_Database.global.Tasks, 
 	{
 		["Character"] = TDL_UncreatedChanges["Character"],
 		["Description"] = TDL_UncreatedChanges["Description"],
@@ -525,8 +523,9 @@ function TDL:AddTask()
 		["Minutes"] = TDL_UncreatedChanges["Minutes"],
 		["AmPm"] = TDL_UncreatedChanges["AmPm"],
 		["LastCompleted"] = nil,
-	}
-
+		["id"] = TDL_Database.global.nextId
+	})
+	TDL_Database.global.nextId = TDL_Database.global.nextId + 1
 end
 
 --TODO
@@ -549,19 +548,19 @@ function TDL:GetExistingTasksGroup()
 	ExistingTasksGroup:AddChild(ExpirationLabel)
 
 	local existingTasks = TDL:GetAllTasks()
-	for i=1, #existingTasks  do
+	for i, task in ipairs(existingTasks) do
 		local task = existingTasks[i]
 		local characterTextBox = TDL:CreateTextBox(
 			task["Character"],
 			ToDoList_EditPage_CharacterColumnWidth,
 			"OnTextChanged",
-			function (textBox) TDL:EditCharacter(task["id"], textBox) end,
+			function (textBox) TDL:EditCharacter(task, textBox) end,
 			true)
 		local descriptionTextBox = TDL:CreateTextBox(
 			task["Description"],
 			ToDoList_EditPage_DescriptionColumnWidth,
 			"OnTextChanged",
-			function (textBox) TDL:EditDescription(task["id"], textbox) end,
+			function (textBox) TDL:EditDescription(task, textbox) end,
 			true)
 		ExistingTasksGroup:AddChild(characterTextBox)
 		ExistingTasksGroup:AddChild(descriptionTextBox)
@@ -569,12 +568,12 @@ function TDL:GetExistingTasksGroup()
 		local checkboxGroup = AceGUI:Create("SimpleGroup")
 		checkboxGroup:SetLayout("Flow")
 		checkboxGroup:SetWidth(ToDoList_EditPage_CheckboxGroupWidth)
-		for i=1,7 do
+		for i, dayIntial in ipairs(TDL_DayInitials) do
 			local checkbox = TDL:CreateCheckbox(
-				TDL_DayInitials[i],
+				dayInitial,
 				ToDoList_EditPage_DayCheckboxWidth,
 				task["Days"][i],
-				function(checkBox) TDL:EditDayNotification(task["id"], i, checkBox) end)
+				function(checkBox) TDL:EditDayNotification(task, i, checkBox) end)
 			checkboxGroup:AddChild(checkbox)
 		end
 		ExistingTasksGroup:AddChild(checkboxGroup)
@@ -582,19 +581,19 @@ function TDL:GetExistingTasksGroup()
 			task["Hours"],
 			ToDoList_EditPage_HourTextboxWidth,
 			"OnTextChanged",
-			function (textBox) TDL:EditHours(task["id"], textBox) end,
+			function (textBox) TDL:EditHours(task, textBox) end,
 			true)
 		HoursTextbox:SetMaxLetters(2)
 		local MinutesTextBox = TDL:CreateTextBox(
 			string.format("%.2d", task["Minutes"]),
 			ToDoList_EditPage_MinutesTextboxWidth,
 			"OnTextChanged",
-			function (textBox) TDL:EditMinutes(task["id"], textBox) end,
+			function (textBox) TDL:EditMinutes(task, textBox) end,
 			true)
 		MinutesTextBox:SetMaxLetters(2)
 		local AmPmDropdown = TDL:CreateDropdown(TDL_AmPmLiterals,
 			ToDoList_EditPage_AmPmDropdownWidth,
-			function(combobox) TDL:EditAmPm(task["id"], combobox) end)
+			function(combobox) TDL:EditAmPm(task, combobox) end)
 		AmPmDropdown:SetValue(task["AmPm"])
 		local colonLabel = TDL:CreateLabel(":", ToDoList_EditPage_ColonLabelWidth)
 
@@ -625,16 +624,16 @@ function TDL:GetDailyResetTimeNoteGroup()
 end
 
 function TDL:GetRemainingTasks()
-	return __.select(TDL_Database.global.Tasks:ToArray(), function(task) return not task["LastCompleted"] end)
+	return __.select(TDL_Database.global.Tasks, function(task) return not task["LastCompleted"] end)
 end
 
 function TDL:GetCompletedTasks()
-	return __.select(TDL_Database.global.Tasks:ToArray(), function(task) return task["LastCompleted"] end)
+	return __.select(TDL_Database.global.Tasks, function(task) return task["LastCompleted"] end)
 end
 
 --TODO
 function TDL:GetAllTasks()
-	return TDL_Database.global.Tasks:ToArray()
+	return TDL_Database.global.Tasks
 end
 
 --TODO
