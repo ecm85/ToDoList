@@ -85,31 +85,35 @@ local __ = requireUnderscore()
 local ToDoList_UpdateInterval = 1.0
 local ToDoList_TimeSinceLastUpdate = 0.0
 
-local ToDoList_WidgetWidth = 725
+local ToDoList_WidgetWidth = 675
 
 local ToDoList_TaskPage_PageWidth = ToDoList_WidgetWidth
 local ToDoList_TaskPage_CharacterColumnWidth = 75
 local ToDoList_TaskPage_DescriptionColumnWidth = 200
 local ToDoList_TaskPage_DateTimeColumnWidth = 125
-local ToDoList_TaskPage_ButtonColumnWidth = 225
+local ToDoList_TaskPage_ButtonColumnWidth = 200
 local ToDoList_TaskPage_ButtonWidth = 125
 local ToDoList_TaskPage_ButtonExtenderWidth = ToDoList_TaskPage_ButtonColumnWidth - ToDoList_TaskPage_ButtonWidth
 
 local ToDoList_EditPage_PageWidth = ToDoList_WidgetWidth
 local ToDoList_EditPage_DailyResetNoteWidth = ToDoList_EditPage_PageWidth - 75
-local ToDoList_EditPage_CheckboxGroupWidth = 150
-local ToDoLIst_EditPage_TimePickerWidth = 175
+local ToDoList_EditPage_CheckboxGroupWidth = 200
+local ToDoLIst_EditPage_TimePickerWidth = 75
 local ToDoList_EditPage_CharacterColumnWidth = 75
 local ToDoList_EditPage_DescriptionColumnWidth = 200
 local ToDoList_EditPage_DateTimeColumnWidth = ToDoList_EditPage_CheckboxGroupWidth + ToDoLIst_EditPage_TimePickerWidth
-local ToDoList_EditPage_EditButtonColumnWidth = 50
-local ToDoList_EditPage_RemoveButtonColumnWidth = 50
+local ToDoList_EditPage_ButtonWidth = 125
 local ToDoList_EditPage_DayCheckboxWidth = 48
 local ToDoList_EditPage_HourTextboxWidth = 30
 local ToDoList_EditPage_MinutesTextboxWidth = 30
 local ToDoList_EditPage_ColonLabelWidth = 10
 local ToDoList_EditPage_AmPmDropdownWidth = 60
-local ToDoList_EditPage_ButtonExtenderWidth = ToDoList_EditPage_PageWidth - ToDoList_EditPage_EditButtonColumnWidth
+local ToDoList_EditPage_AddButtonsExtenderWidth = ToDoList_EditPage_PageWidth - ToDoList_EditPage_ButtonWidth
+local ToDoList_EditPage_EditButtonsExtenderWidth = ToDoList_EditPage_PageWidth - (ToDoList_EditPage_ButtonWidth * 2)
+local ToDoList_EditPage_TaskSelectionDropdownWidth = 400
+
+local ToDoList_TaskPage = 1
+local ToDoList_EditPage = 2
 
 local TDL_DayInitials =
 {
@@ -200,7 +204,7 @@ function TDL:SetUpDefaultCharValues()
 end
 
 function TDL:InitializeUncreatedChanges()
-	TDL_UncreatedChanges =
+	return 
 	{
 		["Character"] = "",
 		["Description"] = "",
@@ -214,11 +218,37 @@ function TDL:InitializeUncreatedChanges()
 			[6] = true,
 			[7] = true
 		},
-		["Hours"] = -1,
-		["Minutes"] = -1,
-		["AmPm"] = 0
+		["Hours"] = "",
+		["Minutes"] = "",
+		["AmPm"] = 1
 	}
 end
+
+function TDL:CloneTask(oldTask)
+	local toReturn = {}
+	TDL:CopyTask(oldTask, toReturn)
+	return toReturn
+end
+
+function TDL:CopyTask(src, dest)
+	dest.Character = src.Character
+	dest.Description = src.Description
+	dest.Days =
+	{
+		[1] = src.Days[1],
+		[2] = src.Days[2],
+		[3] = src.Days[3],
+		[4] = src.Days[4],
+		[5] = src.Days[5],
+		[6] = src.Days[6],
+		[7] = src.Days[7]
+	}
+	dest.Hours = src.Hours
+	dest.Minutes = src.Minutes
+	dest.AmPm = src.AmPm
+	dest.id = src.id
+end
+
 
 function TDL:OnInitialize()
     -- Called when the addon is loaded
@@ -272,8 +302,8 @@ function TDL:DrawAddRemoveTab(container)
 	AddTaskGroup:SetLayout("Flow")
 	DailyResetTimeNoteGroup:SetLayout("Flow")
 	ScrollFrame:AddChild(AddTaskGroup)
-	ScrollFrame:AddChild(DailyResetTimeNoteGroup)
 	ScrollFrame:AddChild(ExistingTasksGroup)
+	ScrollFrame:AddChild(DailyResetTimeNoteGroup)
 	container:AddChild(ScrollFrame)
 end
 
@@ -332,7 +362,6 @@ function TDL:GetCompletedTasksGroup()
 
 	local completedTasks = TDL:GetCompletedTasks()
 	for i, task in ipairs(completedTasks) do
-		local taskLabel = AceGUI:Create("Label")
 		local characterLabel = TDL:CreateLabel(task["Character"], ToDoList_TaskPage_CharacterColumnWidth)
 		local taskLabel = TDL:CreateLabel(task["Description"], ToDoList_TaskPage_DescriptionColumnWidth)
 		local expirationLabel = TDL:CreateLabel(date("%c", task["LastCompleted"]), ToDoList_TaskPage_DateTimeColumnWidth)
@@ -345,156 +374,34 @@ function TDL:GetCompletedTasksGroup()
 	return CompletedTasksGroup
 end
 
-
 function TDL:GetExistingTasksGroup()
-	local ExistingTasksGroup = AceGUI:Create("InlineGroup")
-	ExistingTasksGroup:SetWidth(ToDoList_EditPage_PageWidth)
-	ExistingTasksGroup:SetTitle("Existing Tasks")
-
-	local CharacterLabel = TDL:CreateColoredLabel("Character", ToDoList_EditPage_CharacterColumnWidth, 0, 1, 0)
-	local DescriptionLabel = TDL:CreateColoredLabel("Description", ToDoList_EditPage_DescriptionColumnWidth, 0, 1, 0)
-	local ExpirationLabel = TDL:CreateColoredLabel("Reminder day/time", ToDoList_EditPage_DateTimeColumnWidth, 0, 1, 0)
-	ExistingTasksGroup:AddChild(CharacterLabel)
-	ExistingTasksGroup:AddChild(DescriptionLabel)
-	ExistingTasksGroup:AddChild(ExpirationLabel)
-
 	local existingTasks = TDL:GetAllTasks()
-	for i, task in ipairs(existingTasks) do
-		local characterTextBox = TDL:CreateTextBox(
-			task["Character"],
-			ToDoList_EditPage_CharacterColumnWidth,
-			"OnTextChanged",
-			function (textBox) TDL:EditCharacter(task, textBox) end,
-			true)
-		local descriptionTextBox = TDL:CreateTextBox(
-			task["Description"],
-			ToDoList_EditPage_DescriptionColumnWidth,
-			"OnTextChanged",
-			function (textBox) TDL:EditDescription(task, textbox) end,
-			true)
-		ExistingTasksGroup:AddChild(characterTextBox)
-		ExistingTasksGroup:AddChild(descriptionTextBox)
-
-		local checkboxGroup = AceGUI:Create("SimpleGroup")
-		checkboxGroup:SetLayout("Flow")
-		checkboxGroup:SetWidth(ToDoList_EditPage_CheckboxGroupWidth)
-		for i, dayIntial in ipairs(TDL_DayInitials) do
-			local checkbox = TDL:CreateCheckbox(
-				dayInitial,
-				ToDoList_EditPage_DayCheckboxWidth,
-				task["Days"][i],
-				function(checkBox) TDL:EditDayNotification(task, i, checkBox) end)
-			checkboxGroup:AddChild(checkbox)
-		end
-		ExistingTasksGroup:AddChild(checkboxGroup)
-		local HoursTextbox = TDL:CreateTextBox(
-			task["Hours"],
-			ToDoList_EditPage_HourTextboxWidth,
-			"OnTextChanged",
-			function (textBox) TDL:EditHours(task, textBox) end,
-			true)
-		HoursTextbox:SetMaxLetters(2)
-		local MinutesTextBox = TDL:CreateTextBox(
-			string.format("%.2d", task["Minutes"]),
-			ToDoList_EditPage_MinutesTextboxWidth,
-			"OnTextChanged",
-			function (textBox) TDL:EditMinutes(task, textBox) end,
-			true)
-		MinutesTextBox:SetMaxLetters(2)
-		local AmPmDropdown = TDL:CreateDropdown(TDL_AmPmLiterals,
-			ToDoList_EditPage_AmPmDropdownWidth,
-			function(combobox) TDL:EditAmPm(task, combobox) end)
-		AmPmDropdown:SetValue(task["AmPm"])
-		local colonLabel = TDL:CreateLabel(":", ToDoList_EditPage_ColonLabelWidth)
-
-		ExistingTasksGroup:AddChild(HoursTextbox)
-		ExistingTasksGroup:AddChild(colonLabel)
-		ExistingTasksGroup:AddChild(MinutesTextBox)
-		ExistingTasksGroup:AddChild(AmPmDropdown)
-
-		local DeleteTaskButton = TDL:CreateButton(
-		"Delete Task",
-		ToDoList_TaskPage_ButtonWidth,
-		function() TDL:DeleteTask(task["id"]) end)
-		ExistingTasksGroup:AddChild(DeleteTaskButton)
-		local blankLabel = TDL:CreateLabel("", ToDoList_EditPage_ButtonExtenderWidth)
-		ExistingTasksGroup:AddChild(blankLabel)
-
+	local existingTasksClone = __.map(existingTasks, function(item) return TDL:CloneTask(item) end)
+	local dropDownGroup = AceGUI:Create("DropdownGroup")
+	dropDownGroup:SetLayout("Flow")
+	dropDownGroup:SetTitle("Choose an existing task to edit:")
+	if (existingTasks and #existingTasks > 0) then
+		dropDownGroup:SetGroupList(__.map(existingTasksClone, function (task) return task["Description"].." ("..task["Character"]..")" end))
+		dropDownGroup:SetCallback("OnGroupSelected", function (dropDownGroup, _, selectedGroup) TDL:ChangeSelectedEditTask(dropDownGroup, existingTasksClone[selectedGroup]) end)
+		dropDownGroup:SetGroup(1)
+	else
+		local emptyList = { [1] = "There are no tasks to edit!" }
+		dropDownGroup:SetGroupList(emptyList)
+		dropDownGroup:SetGroup(1)
 	end
-
-	return ExistingTasksGroup
+	dropDownGroup:SetWidth(ToDoList_EditPage_PageWidth)
+	dropDownGroup:SetDropdownWidth(ToDoList_EditPage_TaskSelectionDropdownWidth)
+	return dropDownGroup
 end
 
 function TDL:GetAddTaskGroup()
-	TDL:InitializeUncreatedChanges()
+	local uncreatedChanges = TDL:InitializeUncreatedChanges()
 	local AddTaskGroup = AceGUI:Create("InlineGroup")
 	AddTaskGroup:SetWidth(ToDoList_EditPage_PageWidth)
 	AddTaskGroup:SetTitle("Add a task")
-
-	local CharacterLabel = TDL:CreateColoredLabel("Character", ToDoList_EditPage_CharacterColumnWidth, 0, 1, 0)
-	local DescriptionLabel = TDL:CreateColoredLabel("Description", ToDoList_EditPage_DescriptionColumnWidth, 0, 1, 0)
-	local ExpirationLabel = TDL:CreateColoredLabel("Reminder day/time", ToDoList_EditPage_DateTimeColumnWidth, 0, 1, 0)
-	AddTaskGroup:AddChild(CharacterLabel)
-	AddTaskGroup:AddChild(DescriptionLabel)
-	AddTaskGroup:AddChild(ExpirationLabel)
-
-	local characterTextBox = TDL:CreateTextBox(
-		"",
-		ToDoList_EditPage_CharacterColumnWidth,
-		"OnTextChanged",
-		function (textBox) TDL:SetUncreatedCharacter(textBox) end,
-		true)
-	local descriptionTextBox = TDL:CreateTextBox(
-		"",
-		ToDoList_EditPage_DescriptionColumnWidth,
-		"OnTextChanged",
-		function (textBox) TDL:SetUncreatedDescription(textBox) end,
-		true)
-	AddTaskGroup:AddChild(characterTextBox)
-	AddTaskGroup:AddChild(descriptionTextBox)
-
-	local checkboxGroup = AceGUI:Create("SimpleGroup")
-	checkboxGroup:SetLayout("Flow")
-	checkboxGroup:SetWidth(ToDoList_EditPage_CheckboxGroupWidth)
-	for i, dayInitial in ipairs(TDL_DayInitials) do
-		local checkbox = TDL:CreateCheckbox(
-			dayInitial,
-			ToDoList_EditPage_DayCheckboxWidth,
-			true,
-			function(checkbox) TDL:SetUncreatedDayNotification(i, checkbox) end)
-		checkboxGroup:AddChild(checkbox)
-	end
-	AddTaskGroup:AddChild(checkboxGroup)
-	local HoursTextbox = TDL:CreateTextBox(
-		"",
-		ToDoList_EditPage_HourTextboxWidth,
-		"OnTextChanged",
-		function (textBox) TDL:SetUncreatedHours(textBox) end,
-		true)
-	HoursTextbox:SetMaxLetters(2)
-	local MinutesTextBox = TDL:CreateTextBox(
-		"",
-		ToDoList_EditPage_MinutesTextboxWidth,
-		"OnTextChanged",
-		function (textBox) TDL:SetUncreatedMinutes(textBox) end,
-		true)
-	MinutesTextBox:SetMaxLetters(2)
-	local AmPmDropdown = TDL:CreateDropdown(TDL_AmPmLiterals,
-		ToDoList_EditPage_AmPmDropdownWidth,
-		function(combobox) TDL:SetUncreatedAmPm(combobox) end)
-	local colonLabel = TDL:CreateLabel(":", ToDoList_EditPage_ColonLabelWidth)
-
-	AddTaskGroup:AddChild(HoursTextbox)
-	AddTaskGroup:AddChild(colonLabel)
-	AddTaskGroup:AddChild(MinutesTextBox)
-	AddTaskGroup:AddChild(AmPmDropdown)
-
-	AddTaskButton = TDL:CreateButton(
-		"Add Task",
-		ToDoList_TaskPage_ButtonWidth,
-		function() TDL:AddTask() end)
-	AddTaskGroup:AddChild(AddTaskButton)
-
+	TDL:AddSingleTaskToGroup(uncreatedChanges,
+		AddTaskGroup,
+		function (statusTextLabel) TDL:AddCreateTaskButtonToGroup(AddTaskGroup, uncreatedChanges, statusTextLabel) end)
 	return AddTaskGroup
 end
 
@@ -506,94 +413,138 @@ function TDL:GetDailyResetTimeNoteGroup()
 	return DailyResetTimeNoteGroup
 end
 
-function TDL:SetUncreatedCharacter(textBox)
-	TDL_UncreatedChanges["Character"] = textBox:GetText()
+function TDL:ChangeSelectedEditTask(dropDownGroup, task)
+	dropDownGroup:ReleaseChildren()
+
+	if (task) then
+		TDL:AddSingleTaskToGroup(
+			task,
+			dropDownGroup,
+			function (statusTextLabel) TDL:AddEditRemoveButtonsToGroup(dropDownGroup, task, statusTextLabel) end)
+	end
 end
 
-function TDL:SetUncreatedDescription(textBox)
-	TDL_UncreatedChanges["Description"] = textBox:GetText()
+function TDL:AddEditRemoveButtonsToGroup(group, task, statusTextLabel)
+
+	local DeleteTaskButton = TDL:CreateButton(
+		"Delete Task",
+		ToDoList_EditPage_ButtonWidth,
+		function() TDL:DeleteTask(task["id"]) end)
+	local SaveChangesButton = TDL:CreateButton(
+		"Save Changes",
+		ToDoList_EditPage_ButtonWidth,
+		function() TDL:SaveChangesToTask(task, statusTextLabel) end)
+	local blankLabel = TDL:CreateLabel("", ToDoList_EditPage_EditButtonsExtenderWidth)
+	group:AddChild(SaveChangesButton)
+	group:AddChild(DeleteTaskButton)
+	group:AddChild(blankLabel)
 end
 
-function TDL:SetUncreatedDayNotification(index, checkbox)
-	TDL_UncreatedChanges["Days"][index] = checkbox:GetValue()
+function TDL:AddCreateTaskButtonToGroup(group, task, statusTextLabel)
+	local AddTaskButton = TDL:CreateButton(
+		"Add Task",
+		ToDoList_TaskPage_ButtonWidth,
+		function() TDL:AddTask(task, statusTextLabel) end)
+	local blankLabel = TDL:CreateLabel("", ToDoList_EditPage_AddButtonsExtenderWidth)
+	group:AddChild(AddTaskButton)
+	group:AddChild(blankLabel)
 end
 
-function TDL:SetUncreatedAmPm(dropdown)
-	TDL_UncreatedChanges["AmPm"] = dropdown:GetValue()
-end
+function TDL:AddSingleTaskToGroup(task, group, buttonSetupCB)
 
-function TDL:SetUncreatedHours(textBox)
-	TDL_UncreatedChanges["Hours"] = textBox:GetText()
-end
+	local CharacterLabel = TDL:CreateColoredLabel("Character", ToDoList_EditPage_CharacterColumnWidth, 0, 1, 0)
+	local DescriptionLabel = TDL:CreateColoredLabel("Description", ToDoList_EditPage_DescriptionColumnWidth, 0, 1, 0)
+	local ExpirationLabel = TDL:CreateColoredLabel("Reminder day/time", ToDoList_EditPage_DateTimeColumnWidth, 0, 1, 0)
+	group:AddChild(CharacterLabel)
+	group:AddChild(DescriptionLabel)
+	group:AddChild(ExpirationLabel)
 
-function TDL:SetUncreatedMinutes(textBox)
-	TDL_UncreatedChanges["Minutes"] = textBox:GetText()
-end
+	local characterTextBox = TDL:CreateTextBox(
+		task["Character"],
+		ToDoList_EditPage_CharacterColumnWidth,
+		"OnTextChanged",
+		function (_, _, newValue) task.Character = newValue end,
+		true)
+	local descriptionTextBox = TDL:CreateTextBox(
+		task["Description"],
+		ToDoList_EditPage_DescriptionColumnWidth,
+		"OnTextChanged",
+		function (_, _, newValue) task.Description = newValue end,
+		true)
+	group:AddChild(characterTextBox)
+	group:AddChild(descriptionTextBox)
+	local checkboxGroup = AceGUI:Create("SimpleGroup")
+	checkboxGroup:SetLayout("Flow")
+	checkboxGroup:SetWidth(ToDoList_EditPage_CheckboxGroupWidth)
+	for i, dayInitial in ipairs(TDL_DayInitials) do
+		local checkbox = TDL:CreateCheckbox(
+			dayInitial,
+			ToDoList_EditPage_DayCheckboxWidth,
+			task["Days"][i],
+			function(_, _, newValue) task.Days[i] = newValue end)
+		checkboxGroup:AddChild(checkbox)
+	end
+	group:AddChild(checkboxGroup)
+	local HoursTextbox = TDL:CreateTextBox(
+		string.format("%.2d", task["Hours"]),
+		ToDoList_EditPage_HourTextboxWidth,
+		"OnTextChanged",
+		function (_, _, newValue) task.Hours = newValue end,
+		true)
+	HoursTextbox:SetMaxLetters(2)
+	local MinutesTextBox = TDL:CreateTextBox(
+		string.format("%.2d", task["Minutes"]),
+		ToDoList_EditPage_MinutesTextboxWidth,
+		"OnTextChanged",
+		function (_, _, newValue) task.Minutes = newValue end,
+		true)
+	MinutesTextBox:SetMaxLetters(2)
+	local AmPmDropdown = TDL:CreateDropdown(TDL_AmPmLiterals,
+		ToDoList_EditPage_AmPmDropdownWidth,
+		function(_, _, newSelected) task.AmPm = newSelected end)
+	AmPmDropdown:SetValue(task["AmPm"])
+	local colonLabel = TDL:CreateLabel(":", ToDoList_EditPage_ColonLabelWidth)
+	local statusTextLabel = TDL:CreateLabel("", ToDoList_EditPage_PageWidth)
 
---todo
-function TDL:EditCharacter(task, textBox)
-	task["Character"] = textBox:GetText()
-end
+	group:AddChild(HoursTextbox)
+	group:AddChild(colonLabel)
+	group:AddChild(MinutesTextBox)
+	group:AddChild(AmPmDropdown)
+	--TODO: Disable edit button until and after changes are made, and create button?
+	--TODO: Set dirty upon any changes and clear out status text?
+	buttonSetupCB(statusTextLabel)
 
---todo
-function TDL:EditDescription(task, textBox)
-	self:Print("You tried to edit id #"..tostring(id))
-end
+	group:AddChild(statusTextLabel)
 
---todo
-function TDL:EditDayNotification(task, index, checkbox)
-	self:Print("You tried to edit id #"..tostring(id))
-end
-
---todo
-function TDL:EditAmPm(task, dropdown)
-	self:Print("You tried to edit id #"..tostring(id))
-end
-
---todo
-function TDL:EditHours(task, textBox)
-	self:Print("You tried to edit id #"..tostring(id))
-end
-
---todo
-function TDL:EditMinutes(task, textBox)
-	self:Print("You tried to edit id #"..tostring(id))
 end
 
 function TDL:DeleteTask(id)
-	TDL_Database.global.Tasks = _.reject(TDL_Datbase.global.Tasks, function (task) return task["id"] == id end)
+	TDL_Database.global.Tasks = __.reject(TDL_Database.global.Tasks, function (task) return task["id"] == id end)
+	TDL:ReloadUI(ToDoList_EditPage)
 end
 
-function TDL:AddTask()
-	local result = TDL:ValidateNewTask()
+function TDL:AddTask(task, statusTextLabel)
+	local result = TDL:ValidateTask(task, statusTextLabel)
 	if (not result) then
 		return
 	end
-	table.insert(TDL_Database.global.Tasks, 
-	{
-		["Character"] = TDL_UncreatedChanges["Character"],
-		["Description"] = TDL_UncreatedChanges["Description"],
-		["Days"] =
-		{
-			[1] = TDL_UncreatedChanges["Days"][1],
-			[2] = TDL_UncreatedChanges["Days"][2],
-			[3] = TDL_UncreatedChanges["Days"][3],
-			[4] = TDL_UncreatedChanges["Days"][4],
-			[5] = TDL_UncreatedChanges["Days"][5],
-			[6] = TDL_UncreatedChanges["Days"][6],
-			[7] = TDL_UncreatedChanges["Days"][7],
-		},
-		["Hours"] = TDL_UncreatedChanges["Hours"],
-		["Minutes"] = TDL_UncreatedChanges["Minutes"],
-		["AmPm"] = TDL_UncreatedChanges["AmPm"],
-		["LastCompleted"] = nil,
-		["id"] = TDL_Database.global.nextId
-	})
+	table.insert(TDL_Database.global.Tasks, TDL:CloneTask(task))
 	TDL_Database.global.nextId = TDL_Database.global.nextId + 1
+	TDL:ReloadUI(ToDoList_EditPage)
+end
+
+function TDL:SaveChangesToTask(task, statusTextLabel)
+	local result = TDL:ValidateTask(task, statusTextLabel)
+	if (not result) then
+		return
+	end
+	local taskToUpdate = __.first(__.select(TDL_Database.global.Tasks, function (item) return item.id == task.id end))
+	TDL:CopyTask(task, taskToUpdate)
+	statusTextLabel:SetText("Changes saved successfully")
 end
 
 --TODO
-function TDL:ValidateNewTask()
+function TDL:ValidateTask(task, statusTextLabel)
 	return true
 end
 
@@ -605,7 +556,6 @@ function TDL:GetCompletedTasks()
 	return __.select(TDL_Database.global.Tasks, function(task) return task["LastCompleted"] end)
 end
 
---TODO
 function TDL:GetAllTasks()
 	return TDL_Database.global.Tasks
 end
@@ -614,24 +564,22 @@ end
 function ResetPastDueTasks()
 end
 
-
+--TODO
 function TDL:SetTaskCompleted (task)
 	self:Print("You tried to complete:")
 	TDL:SafelyPrintVariable(task)
 end
 
-
-
-local function SelectGroup(container,event,group)
+local function SelectTab(container,event,tab)
 	container:ReleaseChildren()
-	if group == "tab1" then
+	if tab == ToDoList_TaskPage then
 		TDL:DrawTaskTab(container)
-	elseif group == "tab2" then
+	elseif tab == ToDoList_EditPage then
 		TDL:DrawAddRemoveTab(container)
 	end
 end
 
-function TDL:InitUI()
+function TDL:InitUI(selectedTab)
 	if windowOpen then
 		TDL.MainWindow:Release()
 		windowOpen = false
@@ -647,26 +595,33 @@ function TDL:InitUI()
 									end)
 	TDL.MainWindow:SetTitle("To Do List")
 	TDL.MainWindow:SetWidth(ToDoList_WidgetWidth)
-	TDL.MainWindow:SetHeight("400")
+	TDL.MainWindow:SetHeight("450")
 	TDL.MainWindow:SetLayout("Fill")
 	TDL.MainWindow:EnableResize(false)
 
 
 	TabGroup = AceGUI:Create("TabGroup")
-	TabGroup:SetTabs({{value = "tab1",text="To-Do List"}, {value = "tab2",text="Add/Remove To-Do's"}})
-	TabGroup:SetCallback("OnGroupSelected", SelectGroup)
+	TabGroup:SetTabs({{value = ToDoList_TaskPage,text="To-Do List"}, {value = ToDoList_EditPage,text="Add/Remove To-Do's"}})
+	TabGroup:SetCallback("OnGroupSelected", SelectTab)
 	TabGroup:SetWidth(ToDoList_WidgetWidth)
 	TabGroup:SetLayout("Fill")
-	TabGroup:SelectTab("tab1")
+	if (not selectedTab) then selectedTab = ToDoList_TaskPage end
+	TabGroup:SelectTab(selectedTab)
 	TDL.MainWindow:AddChild(TabGroup)
 
 	windowOpen = true
 end
 
+function TDL:ReloadUI(selectedTab)
+	TDL:InitUI()
+	TDL:InitUI(selectedTab)
+end
+
+
 --
 -- Tracker Frame
 --
-
+--TODO
 function TDL:CreateTrackingFrame()
 	TDL.TrackingFrame = CreateFrame("Frame","TrackingFrame",UIParent)
 	TDL.TrackingFrame:SetMovable(true)
