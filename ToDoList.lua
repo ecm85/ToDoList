@@ -1,12 +1,15 @@
 --Mod todos:
 --js lint equiv
 --unit tests
+--Move all data access out
+--Consolidate id's on login
+--Move all task-related things to Task
+--Move static things into other files
 --feature todos:
---validation
 --tracking pane
---reset tasks at correct time and onload
 --change remaining task view to show 'next reset time/day' in # hours?
 --pretty-up completed task view - times/format, show  reset time?
+--Disable edit button until and after changes are made, and create button?
 
 --Future features:
 --Allow time zone changing (enter task in one tz, then log in while in another)
@@ -21,25 +24,12 @@ TDL.LDBIcon = LibStub("LibDBIcon-1.0")
 local TDLLauncher = LibStub("LibDataBroker-1.1", true):NewDataObject("TDL", {
 	type = "launcher",
 	icon = "Interface\\Icons\\inv_scroll_09",
-	OnClick = function(_,button) -- fires when a user clicks on the minimap icon
-			if button == "RightButton" then
-				TDL_Database.char.showTrackingFrame = not TDL_Database.char.showTrackingFrame
-				if TDL_Database.char.showTrackingFrame then
-					TDL.TrackingFrame:Show()
-				else
-					TDL.TrackingFrame:Hide()
-				end
-			else
-				TDL:InitUI()
-			end
-		end,
+	OnClick = function() TDL:InitUI() end,
 	OnTooltipShow = function(tt) -- tooltip that shows when you hover over the minimap icon
 			local cs = "|cffffffcc"
 			local ce = "|r"
 			tt:AddLine("To-Do List")
-			tt:AddLine(string.format("%sLeft-Click%s to open the configuration window", cs, ce))
-			tt:AddLine(string.format("%sRight-Click%s to hide/show the tracking window", cs, ce))
-			tt:AddLine(string.format("%sDrag%s to move this button", cs, ce))
+			tt:AddLine(string.format("%sClick%s to open the configuration window", cs, ce))
 		end,
 	})
 
@@ -84,10 +74,6 @@ function TDL:CreateDropdown(values, width, cb)
 	dropDown:SetCallback("OnValueChanged", cb)
 	return dropDown
 end
-
---TODO: MOve all data access out
---TODO: Consolidate id's on login
---TODO: Move all task-related things to Task
 
 function TDL:CreateColoredLabel (text, width, colorArg1, colorArg2, colorArg3)
 	local label = TDL:CreateLabel(text, width)
@@ -235,22 +221,11 @@ end
 TDL:RegisterChatCommand("tdl","InitUI")
 TDL:RegisterChatCommand("todo","InitUI")
 TDL:RegisterChatCommand("todolist","InitUI")
-TDL:RegisterChatCommand("tdl-reset", "ResetTrackingFrame")
-TDL:RegisterChatCommand("todo-reset", "ResetTrackingFrame")
-TDL:RegisterChatCommand("todolist-reset", "ResetTrackingFrame")
 
 function TDL:SetUpDefaultCharValues()
 	TDL_Database.char.hasDefaults = true
 	TDL_Database.char.showMinimapIcon = true
-	TDL_Database.char.showTrackingFrame = true
-	TDL_Database.char.lockTrackingFrame = false
 	TDL_Database.char.announceMethod = 1
-	TDL_Database.char.TrackingFramePos =
-	{
-		[1] = 0,
-		[2] = 0,
-		[3] = "CENTER"
-	}
 	TDL_Database.char.minimapIcon =
 	{
 		["hide"] = false,
@@ -317,13 +292,11 @@ function TDL:OnInitialize()
 		TDL_Database.global.nextId = 0
 	end
     TDL:CreateMinimapButton()
-    TDL:CreateTrackingFrame()
 end
 
 function TDL:OnEnable()
 	-- Called when the addon is enabled
 	self:Print("To-Do List enabled. /todo to configure.")
-	TDL:ReloadTrackingFrame()
 end
 
 function TDL:DrawTaskTab(container)
@@ -576,8 +549,6 @@ function TDL:AddSingleTaskToGroup(task, group, buttonSetupCB)
 	group:AddChild(colonLabel)
 	group:AddChild(MinutesTextBox)
 	group:AddChild(AmPmDropdown)
-	--TODO: Disable edit button until and after changes are made, and create button?
-	--TODO: Set dirty upon any changes and clear out status text?
 	buttonSetupCB(statusTextLabel)
 
 	group:AddChild(statusTextLabel)
@@ -746,130 +717,18 @@ function TDL:ReloadUI(selectedTab)
 	TDL:InitUI(selectedTab)
 end
 
-
---
--- Tracker Frame
---
---TODO
-function TDL:CreateTrackingFrame()
-	TDL.TrackingFrame = CreateFrame("Frame","TrackingFrame",UIParent)
-	TDL.TrackingFrame:SetMovable(true)
-    TDL.TrackingFrame:EnableMouse(true)
-    TDL.TrackingFrame:SetClampedToScreen(true)
-    TDL.TrackingFrame:RegisterForDrag("LeftButton")
-    TDL.TrackingFrame:SetScript("OnUpdate",TDL_OnUpdate)
-    TDL.TrackingFrame:SetScript("OnDragStart", TDL.TrackingFrame.StartMoving)
-    TDL.TrackingFrame:SetScript("OnDragStop", TDL.TrackingFrame.StopMovingOrSizing)
-	TDL.TrackingFrame:SetBackdropColor(0,0,0,1);
-	TDL.TrackingFrame:SetHeight(200)
-	TDL.TrackingFrame:SetWidth(300)
-	TDL.TrackingFrame:SetAlpha(1.0)
-
-    local lbls = {}
-    local lblBtns = {}
-    local headers = {}
-    local btns = {}
-    local ypos = 0
-
-
-    -- Create title text
-    local title = TDL.TrackingFrame:CreateFontString("TitleText",nil,"GameFontNormalLarge")
-	title:SetText("|cff7FFF00To-Do List|r")
-	title:SetPoint("TOPLEFT",TDL.TrackingFrame,"TOPLEFT",-4,-ypos)
-	title:Show()
-	ypos = ypos + 18
-
-	--Changed to display the completed quests and countdown time
-    TDL.timer = TDL.TrackingFrame:CreateFontString("TimerText",nil,"GameFontNormal")
-	--DTD.timer:SetText("|cffFFFFFF ("..GetDailyQuestsCompleted().."/"..GetMaxDailyQuests()..") "..SecondsToTime(GetQuestResetTime()).."|r")
-	TDL.timer:SetText("|cffFFFFFF Quests completed ("..GetDailyQuestsCompleted()..") "..SecondsToTime(GetQuestResetTime()).."|r")
-	TDL.timer:SetPoint("TOPLEFT",TDL.TrackingFrame,"TOPLEFT",5,-ypos)
-	TDL.timer:Show()
-
-	ypos = ypos + 14
-
-    i = 0
-
-	TDL.TrackingFrame:SetHeight(32)
-    local xO,yO = TDL_Database.char.TrackingFramePos[1],TDL_Database.char.TrackingFramePos[2]
-    TDL.TrackingFrame:SetPoint(TDL_Database.char.TrackingFramePos[3],nil,TDL_Database.char.TrackingFramePos[3],xO,yO-(TDL.TrackingFrame:GetHeight()/2))
-
-    collectgarbage()
-
-
-    if not TDL_Database.char.showTrackingFrame then
-		TDL.TrackingFrame:Hide()
-	else
-		TDL.TrackingFrame:Show()
-	end
-
-	if TDL_Database.char.lockTrackingFrame then
-		TDL.TrackingFrame:SetMovable(false)
-    	TDL.TrackingFrame:EnableMouse(false)
-    else
-    	TDL.TrackingFrame:SetMovable(true)
-		TDL.TrackingFrame:EnableMouse(true)
-    end
-
-end
-
-function TDL:ReloadTrackingFrame()
-	-- Reload the onscreen tracking frame
-	local point, relativeTo, relativePoint, xOfs, yOfs = TDL.TrackingFrame:GetPoint()
-	TDL_Database.char.TrackingFramePos[1] = xOfs
-    TDL_Database.char.TrackingFramePos[2] = yOfs+(TDL.TrackingFrame:GetHeight()/2)
-	TDL_Database.char.TrackingFramePos[3] = point
-
-	TDL.TrackingFrame:Hide()
-	TDL.TrackingFrame = nil
-	collectgarbage()
-
-	TDL:CreateTrackingFrame()
-end
-
-function TDL:ResetTrackingFrame()
-	TDL_Database.char.TrackingFramePos =
-	{
-		[1] = 0,
-		[2] = 0,
-		[3] = "CENTER"
-	}
-
-	TDL.TrackingFrame:Hide()
-	TDL.TrackingFrame = nil
-	collectgarbage()
-
-	TDL:CreateTrackingFrame()
-
-end
-
---
--- Minimap Button
---
-
 function TDL:CreateMinimapButton()
-	-- create / register the minimap button
 	TDL.LDBIcon:Register("TDL", TDLLauncher, TDL_Database.char.minimapIcon)
 end
 
---
---	QUEST TRACKING
---
-
-
 function TDL:ResetData()
-
 	TDL_Database:ResetDB()
 	collectgarbage()
 
 	TDL.LDBIcon:Show("TDL")
-	TDL:ReloadTrackingFrame()
 	TDL:CheckPlayerData()
 end
 
---
--- OnUpdate, just for fun
---
 function TDL_OnUpdate(self, elapsed)
   ToDoList_TimeSinceLastUpdate = ToDoList_TimeSinceLastUpdate + elapsed;
 
