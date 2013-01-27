@@ -6,10 +6,14 @@
 --tracking pane
 --reset tasks at correct time and onload
 --change remaining task view to show 'next reset time/day' in # hours?
---pretty-up completed task view - times?
+--pretty-up completed task view - times/format, show  reset time?
 
 --Future features:
 --Allow time zone changing (enter task in one tz, then log in while in another)
+--Allow to recant 'completion' if misclick etc
+
+
+
 
 TDL = LibStub("AceAddon-3.0"):NewAddon("TDL", "AceConsole-3.0", "AceEvent-3.0", "AceHook-3.0")
 
@@ -183,6 +187,52 @@ local function CurrentTimeZoneString()
 	return returnString
 end
 
+local monthLengths =
+{
+	[1] = 31,
+	[2] = 28,
+	[3] = 31,
+	[4] = 30,
+	[5] = 31,
+	[6] = 30,
+	[7] = 31,
+	[8] = 31,
+	[9] = 30,
+	[10] = 31,
+	[11] = 30,
+	[12] = 31
+}
+local maxMonthLength = 31
+
+local function AddDays(currentDay, currentMonth, currentYear, daysToAdd)
+	if (currentDay > maxMonthLength or currentMonth > #monthLengths or currentYear < 1) then
+		return -1, -1, -1
+	end
+	newDay = currentDay + daysToAdd
+	newMonth = currentMonth
+	newYear = currentYear
+	if daysToAdd > 0 then
+		while (newDay > monthLengths[newMonth]) do
+			newDay = newDay - month.monthLengths[newMonth]
+			newMonth = newMonth + 1
+			if (newMonth > yearLength) then
+				newMonth = 1
+				newYear = newYear + 1
+			end
+		end
+	else
+		while newDay < 1 do
+			newMonth = newMonth - 1
+			newDay = newDay + monthLengths[newMonth]
+			if newMonth < 0 then
+				newMonth = #monthLengths
+				newYear = newYear - 1
+			end
+		end
+	end
+	return newDay, newMonth, newYear
+end
+
 --------------------------------------------------------------------------
 
 TDL:RegisterChatCommand("tdl","InitUI")
@@ -288,11 +338,14 @@ function TDL:DrawTaskTab(container)
 
 	local RemainingTasksGroup = TDL:GetRemainingTasksGroup()
 	local CompletedTasksGroup = TDL:GetCompletedTasksGroup()
+	local RefreshButtonGroup =  TDL:GetRefreshButtonGroup()
 
 	RemainingTasksGroup:SetLayout("Flow")
 	CompletedTasksGroup:SetLayout("Flow")
+	RefreshButtonGroup:SetLayout("Flow")
 	ScrollFrame:AddChild(RemainingTasksGroup)
 	ScrollFrame:AddChild(CompletedTasksGroup)
+	ScrollFrame:AddChild(RefreshButtonGroup)
 	container:AddChild(ScrollFrame)
 end
 
@@ -422,6 +475,13 @@ function TDL:GetDailyResetTimeNoteGroup()
 	return DailyResetTimeNoteGroup
 end
 
+function TDL:GetRefreshButtonGroup()
+	local RefreshButtonGroup = AceGUI:Create("SimpleGroup")
+	local dailyResetTimeNote = TDL:CreateButton("Refresh Tasks", ToDoList_TaskPage_ButtonWidth, function () TDL:ReloadUI(ToDoList_TaskPage) end)
+	RefreshButtonGroup:AddChild(dailyResetTimeNote)
+	return RefreshButtonGroup
+end
+
 function TDL:ChangeSelectedEditTask(dropDownGroup, task)
 	dropDownGroup:ReleaseChildren()
 
@@ -537,6 +597,9 @@ function TDL:AddTask(task, statusTextLabel)
 	if (not result) then
 		return
 	end
+	local newTask = TDL:CloneTask(task)
+	task.Hours = tonumber(task.Hours)
+	task.Minutes = tonumber(task.Minutes)
 	table.insert(TDL_Database.global.Tasks, TDL:CloneTask(task))
 	TDL_Database.global.nextId = TDL_Database.global.nextId + 1
 	TDL:ReloadUI(ToDoList_EditPage)
@@ -549,7 +612,9 @@ function TDL:SaveChangesToTask(task, statusTextLabel)
 	end
 	local taskToUpdate = __.first(__.select(TDL_Database.global.Tasks, function (item) return item.id == task.id end))
 	TDL:CopyTask(task, taskToUpdate)
-	statusTextLabel:SetText("Changes saved successfully")
+	taskToUpdate.Hours = tonumber(task.Hours)
+	taskToUpdate.Minutes = tonumber(task.Minutes)
+	TDL:ReloadUI(ToDoList_EditPage)
 end
 
 --TODO
@@ -569,17 +634,54 @@ function TDL:GetAllTasks()
 	return TDL_Database.global.Tasks
 end
 
---TODO
-function ResetPastDueTasks()
+function TDL:GetDaysToCheck(today)
+	local toReturn = {}
+	for i=today - 1,1, -1 do
+		table.insert(toReturn, i)
+	end
+	for i=7, today + 1,-1 do
+		table.insert(toReturn, i)
+	end
+	return toReturn
 end
 
---TODO
+function TDL:GetMostRecentResetTime(minutes, hours, days)
+	local currentTimeTable = date("*t")
+	--check if one has elapsed today, then the rest of the week, then a week ago today
+	if (days[currentTimeTable.wday] == true and (currentTimeTable.hour > hours or (currentTimeTable.hour == hours and currentTimeTable.min > minutes))) then
+		return time{year=currentTimeTable.year, month=currentTimeTable.month, day=currentTimeTable.day, hour=hours, min=minutes}
+	else
+		local daysToCheck = TDL:GetDaysToCheck(currentTimeTable.wday)
+		for i, dayToCheck in ipairs(daysToCheck) do
+			if (days[dayToCheck] == true) then
+				local day, month, year = AddDays(currentTimeTable.day, currentTimeTable.month, currentTimeTable.year, dayToCheck - currentTimeTable.wday)
+				return time{year=year, month=month, day=day, hour=hours, min=minutes}
+			end
+		end
+		local day, month, year = AddDays(currentTimeTable.day, currentTimeTable.month, currentTimeTable.year, -7)
+		return time{year=year, month=month, day=day, hour=hours, min=minutes}
+	end
+end
+
+function TDL:ResetCompletedTasks()
+	local completedTasks = TDL:GetCompletedTasks()
+	for i, task in ipairs(completedTasks) do
+		local hours = task.Hours
+		if (task.AmPm == 2) then
+			hours = hours + 12
+		end
+		local mostRecentResetTime = TDL:GetMostRecentResetTime(task.Minutes, hours, task.Days)
+		if mostRecentResetTime > task["LastCompleted"] then task["LastCompleted"] = nil end
+	end
+end
+
 function TDL:SetTaskCompleted (task)
-	self:Print("You tried to complete:")
-	TDL:SafelyPrintVariable(task)
+	task["LastCompleted"] = time()
+	TDL:ReloadUI(ToDoList_TaskPage)
 end
 
 local function SelectTab(container,event,tab)
+	TDL:ResetCompletedTasks()
 	container:ReleaseChildren()
 	if tab == ToDoList_TaskPage then
 		TDL:DrawTaskTab(container)
@@ -595,6 +697,8 @@ function TDL:InitUI(selectedTab)
 		collectgarbage()
 		return
 	end
+
+	TDL:ResetCompletedTasks()
 	-- Create a container frame
 	-- Called when the user enters the console command
 	TDL.MainWindow = AceGUI:Create("Window")
@@ -617,7 +721,6 @@ function TDL:InitUI(selectedTab)
 	if (not selectedTab) then selectedTab = ToDoList_TaskPage end
 	TabGroup:SelectTab(selectedTab)
 	TDL.MainWindow:AddChild(TabGroup)
-
 	windowOpen = true
 end
 
@@ -754,9 +857,9 @@ function TDL_OnUpdate(self, elapsed)
   ToDoList_TimeSinceLastUpdate = ToDoList_TimeSinceLastUpdate + elapsed;
 
   if (ToDoList_TimeSinceLastUpdate > ToDoList_UpdateInterval) then
-  	--DTD.timer:SetText("|cffFFFFFF ("..GetDailyQuestsCompleted().."/"..GetMaxDailyQuests()..") "..SecondsToTime(GetQuestResetTime()).."|r")
 	TDL.timer:SetText("|cffFFFFFF Quests completed ("..GetDailyQuestsCompleted()..") "..SecondsToTime(GetQuestResetTime()).."|r")
     ToDoList_TimeSinceLastUpdate = 0;
+    TDL:ResetCompletedTasks()
   end
 
 end
