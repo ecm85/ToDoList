@@ -1,3 +1,16 @@
+--Mod todos:
+--js lint equiv
+--unit tests
+--feature todos:
+--validation
+--tracking pane
+--reset tasks at correct time and onload
+--change remaining task view to show 'next reset time/day' in # hours?
+--pretty-up completed task view - times?
+
+--Future features:
+--Allow time zone changing (enter task in one tz, then log in while in another)
+
 TDL = LibStub("AceAddon-3.0"):NewAddon("TDL", "AceConsole-3.0", "AceEvent-3.0", "AceHook-3.0")
 
 local QTip = LibStub('LibQTip-1.0')
@@ -71,6 +84,10 @@ function TDL:CreateDropdown(values, width, cb)
 	return dropDown
 end
 
+--TODO: MOve all data access out
+--TODO: Consolidate id's on login
+--TODO: Move all task-related things to Task
+
 function TDL:CreateColoredLabel (text, width, colorArg1, colorArg2, colorArg3)
 	local label = TDL:CreateLabel(text, width)
 	label:SetColor(colorArg1, colorArg2, colorArg3)
@@ -81,6 +98,8 @@ end
 local windowOpen = false
 local tab = 1
 local __ = requireUnderscore()
+TDL_HourDiff = 0
+TDL_MinuteDiff = 0
 
 local ToDoList_UpdateInterval = 1.0
 local ToDoList_TimeSinceLastUpdate = 0.0
@@ -142,22 +161,14 @@ local function get_timezone()
 end
 
 -- Return a timezone string in ISO 8601:2000 standard form (+hhmm or -hhmm)
-local function get_tzoffset(timezone)
+local function SecondsToHoursMinutes (timezone)
   local h, m = math.modf(timezone / 3600)
   return h, 60 * m
 end
 
--- return the timezone offset in seconds, as it was on the time given by ts
-local function get_timezone_offset(ts)
-	local utcdate   = date("!*t", ts)
-	local localdate = date("*t", ts)
-	localdate.isdst = false -- this is the trick
-	return difftime(time(localdate), time(utcdate))
-end
-
 local function CurrentTimeZoneString()
-	timezoneDiff = get_timezone_offset(time())
-	hourDiff, minuteDiff = get_tzoffset(timezoneDiff)
+	local timezoneDiff = get_timezone(time())
+	local hourDiff, minuteDiff = SecondsToHoursMinutes(timezoneDiff)
 	minuteDiff = math.abs(minuteDiff)
 	timeZoneStrings =
 	{
@@ -218,8 +229,8 @@ function TDL:InitializeUncreatedChanges()
 			[6] = true,
 			[7] = true
 		},
-		["Hours"] = "",
-		["Minutes"] = "",
+		["Hours"] = 12 - TDL_HourDiff,
+		["Minutes"] = 0 - TDL_MinuteDiff,
 		["AmPm"] = 1
 	}
 end
@@ -267,6 +278,8 @@ end
 function TDL:OnEnable()
 	-- Called when the addon is enabled
 	self:Print("To-Do List enabled. /todo to configure.")
+	local timezoneDiff = get_timezone(time())
+	TDL_HourDiff, TDL_MinuteDiff = SecondsToHoursMinutes(timezoneDiff)
 	TDL:ReloadTrackingFrame()
 end
 
@@ -328,7 +341,7 @@ function TDL:GetRemainingTasksGroup()
 		local expirationGroup = AceGUI:Create("SimpleGroup")
 		expirationGroup:SetWidth(ToDoList_TaskPage_DateTimeColumnWidth)
 		local expirationDaysLabel = TDL:CreateLabel(TDL:GetExpirationDaysString(task["Days"]), ToDoList_TaskPage_DateTimeColumnWidth)
-		local expirationTimeLabel = TDL:CreateLabel(TDL:GetExpirationTimeString(task["Hours"], task["Minutes"], task["AmPm"]), ToDoList_TaskPage_DateTimeColumnWidth)
+		local expirationTimeLabel = TDL:CreateLabel(TDL:GetExpirationTimeString(task["Hours"] + TDL_HourDiff, task["Minutes"] + TDL_MinuteDiff, task["AmPm"]), ToDoList_TaskPage_DateTimeColumnWidth)
 		expirationGroup:AddChild(expirationDaysLabel)
 		expirationGroup:AddChild(expirationTimeLabel)
 		local markCompletedButton = TDL:CreateButton(
@@ -486,17 +499,25 @@ function TDL:AddSingleTaskToGroup(task, group, buttonSetupCB)
 	end
 	group:AddChild(checkboxGroup)
 	local HoursTextbox = TDL:CreateTextBox(
-		string.format("%.2d", task["Hours"]),
+		string.format("%.2d", task["Hours"] + TDL_HourDiff),
 		ToDoList_EditPage_HourTextboxWidth,
 		"OnTextChanged",
-		function (_, _, newValue) task.Hours = newValue end,
+		function (_, _, newValue)
+			newValue = tonumber(newValue)
+			if newValue then newValue = newValue - TDL_HourDiff end
+			task.Hours = newValue
+		end,
 		true)
 	HoursTextbox:SetMaxLetters(2)
 	local MinutesTextBox = TDL:CreateTextBox(
-		string.format("%.2d", task["Minutes"]),
+		string.format("%.2d", task["Minutes"] + TDL_MinuteDiff),
 		ToDoList_EditPage_MinutesTextboxWidth,
 		"OnTextChanged",
-		function (_, _, newValue) task.Minutes = newValue end,
+		function (_, _, newValue) 
+			newValue = tonumber(newValue)
+			if newValue then newValue = newValue - TDL_MinuteDiff end
+			task.Minutes = newValue
+		end,
 		true)
 	MinutesTextBox:SetMaxLetters(2)
 	local AmPmDropdown = TDL:CreateDropdown(TDL_AmPmLiterals,
