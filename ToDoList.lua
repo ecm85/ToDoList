@@ -98,8 +98,6 @@ end
 local windowOpen = false
 local tab = 1
 local __ = requireUnderscore()
-TDL_HourDiff = 0
-TDL_MinuteDiff = 0
 
 local ToDoList_UpdateInterval = 1.0
 local ToDoList_TimeSinceLastUpdate = 0.0
@@ -229,8 +227,8 @@ function TDL:InitializeUncreatedChanges()
 			[6] = true,
 			[7] = true
 		},
-		["Hours"] = 12 - TDL_HourDiff,
-		["Minutes"] = 0 - TDL_MinuteDiff,
+		["Hours"] = 12,
+		["Minutes"] = 0,
 		["AmPm"] = 1
 	}
 end
@@ -278,8 +276,6 @@ end
 function TDL:OnEnable()
 	-- Called when the addon is enabled
 	self:Print("To-Do List enabled. /todo to configure.")
-	local timezoneDiff = get_timezone(time())
-	TDL_HourDiff, TDL_MinuteDiff = SecondsToHoursMinutes(timezoneDiff)
 	TDL:ReloadTrackingFrame()
 end
 
@@ -341,7 +337,7 @@ function TDL:GetRemainingTasksGroup()
 		local expirationGroup = AceGUI:Create("SimpleGroup")
 		expirationGroup:SetWidth(ToDoList_TaskPage_DateTimeColumnWidth)
 		local expirationDaysLabel = TDL:CreateLabel(TDL:GetExpirationDaysString(task["Days"]), ToDoList_TaskPage_DateTimeColumnWidth)
-		local expirationTimeLabel = TDL:CreateLabel(TDL:GetExpirationTimeString(task["Hours"] + TDL_HourDiff, task["Minutes"] + TDL_MinuteDiff, task["AmPm"]), ToDoList_TaskPage_DateTimeColumnWidth)
+		local expirationTimeLabel = TDL:CreateLabel(TDL:GetExpirationTimeString(task["Hours"], task["Minutes"], task["AmPm"]), ToDoList_TaskPage_DateTimeColumnWidth)
 		expirationGroup:AddChild(expirationDaysLabel)
 		expirationGroup:AddChild(expirationTimeLabel)
 		local markCompletedButton = TDL:CreateButton(
@@ -499,25 +495,17 @@ function TDL:AddSingleTaskToGroup(task, group, buttonSetupCB)
 	end
 	group:AddChild(checkboxGroup)
 	local HoursTextbox = TDL:CreateTextBox(
-		string.format("%.2d", task["Hours"] + TDL_HourDiff),
+		string.format("%.2d", task["Hours"]),
 		ToDoList_EditPage_HourTextboxWidth,
 		"OnTextChanged",
-		function (_, _, newValue)
-			newValue = tonumber(newValue)
-			if newValue then newValue = newValue - TDL_HourDiff end
-			task.Hours = newValue
-		end,
+		function (_, _, newValue) task.Hours = newValue end,
 		true)
 	HoursTextbox:SetMaxLetters(2)
 	local MinutesTextBox = TDL:CreateTextBox(
-		string.format("%.2d", task["Minutes"] + TDL_MinuteDiff),
+		string.format("%.2d", task["Minutes"]),
 		ToDoList_EditPage_MinutesTextboxWidth,
 		"OnTextChanged",
-		function (_, _, newValue) 
-			newValue = tonumber(newValue)
-			if newValue then newValue = newValue - TDL_MinuteDiff end
-			task.Minutes = newValue
-		end,
+		function (_, _, newValue) task.Minutes = newValue end,
 		true)
 	MinutesTextBox:SetMaxLetters(2)
 	local AmPmDropdown = TDL:CreateDropdown(TDL_AmPmLiterals,
