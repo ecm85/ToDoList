@@ -12,9 +12,6 @@
 --Allow time zone changing (enter task in one tz, then log in while in another)
 --Allow to recant 'completion' if misclick etc
 
-
-
-
 TDL = LibStub("AceAddon-3.0"):NewAddon("TDL", "AceConsole-3.0", "AceEvent-3.0", "AceHook-3.0")
 
 local QTip = LibStub('LibQTip-1.0')
@@ -106,7 +103,7 @@ local __ = requireUnderscore()
 local ToDoList_UpdateInterval = 1.0
 local ToDoList_TimeSinceLastUpdate = 0.0
 
-local ToDoList_WidgetWidth = 675
+local ToDoList_WidgetWidth = 690
 
 local ToDoList_TaskPage_PageWidth = ToDoList_WidgetWidth
 local ToDoList_TaskPage_CharacterColumnWidth = 75
@@ -213,9 +210,9 @@ local function AddDays(currentDay, currentMonth, currentYear, daysToAdd)
 	newYear = currentYear
 	if daysToAdd > 0 then
 		while (newDay > monthLengths[newMonth]) do
-			newDay = newDay - month.monthLengths[newMonth]
+			newDay = newDay - monthLengths[newMonth]
 			newMonth = newMonth + 1
-			if (newMonth > yearLength) then
+			if (newMonth > #monthLengths) then
 				newMonth = 1
 				newYear = newYear + 1
 			end
@@ -600,6 +597,7 @@ function TDL:AddTask(task, statusTextLabel)
 	local newTask = TDL:CloneTask(task)
 	task.Hours = tonumber(task.Hours)
 	task.Minutes = tonumber(task.Minutes)
+	task.id = TDL_Database.global.nextId
 	table.insert(TDL_Database.global.Tasks, TDL:CloneTask(task))
 	TDL_Database.global.nextId = TDL_Database.global.nextId + 1
 	TDL:ReloadUI(ToDoList_EditPage)
@@ -617,9 +615,28 @@ function TDL:SaveChangesToTask(task, statusTextLabel)
 	TDL:ReloadUI(ToDoList_EditPage)
 end
 
---TODO
 function TDL:ValidateTask(task, statusTextLabel)
-	return true
+	if task.Description == nil or task.Description == "" then
+		statusTextLabel:SetText("Please enter a description.")
+		return false
+	elseif task.Character == nil or task.Character == "" then
+		statusTextLabel:SetText("Please enter a character to associate with this task.")
+		return false
+	elseif task.AmPm ~= 1 and task.AmPm ~= 2 then
+		statusTextLabel:SetText("Please choose AM or PM.")
+		return false
+	elseif #__.select(task.Days, function (item) return item == true end) == 0 then
+		statusTextLabel:SetText("Please select at least one day for the task.")
+		return false
+	else
+		local hours = tonumber(task.Hours)
+		local minutes = tonumber(task.Minutes)
+		if not hours or hours < 1 or hours > 12  or not minutes or minutes < 0 or minutes > 59 then
+			statusTextLabel:SetText("Please select a valid time.")
+			return false
+		end
+		return true
+	end
 end
 
 function TDL:GetRemainingTasks()
@@ -654,7 +671,7 @@ function TDL:GetMostRecentResetTime(minutes, hours, days)
 		local daysToCheck = TDL:GetDaysToCheck(currentTimeTable.wday)
 		for i, dayToCheck in ipairs(daysToCheck) do
 			if (days[dayToCheck] == true) then
-				local day, month, year = AddDays(currentTimeTable.day, currentTimeTable.month, currentTimeTable.year, dayToCheck - currentTimeTable.wday)
+				local day, month, year = AddDays(currentTimeTable.day, currentTimeTable.month, currentTimeTable.year, 0 - i)
 				return time{year=year, month=month, day=day, hour=hours, min=minutes}
 			end
 		end
