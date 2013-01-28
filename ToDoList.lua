@@ -5,11 +5,13 @@
 --Consolidate id's on login
 --Move all task-related things to Task
 --Move static things into other files
+
 --feature todos:
 --tracking pane
 --change remaining task view to show 'next reset time/day' in # hours?
 --pretty-up completed task view - times/format, show  reset time?
 --Disable edit button until and after changes are made, and create button?
+--sort tasks/allow sorting by character/name/reset time?
 
 --Future features:
 --Allow time zone changing (enter task in one tz, then log in while in another)
@@ -85,6 +87,7 @@ end
 local windowOpen = false
 local tab = 1
 local __ = requireUnderscore()
+local DateTimeUtil = requireDateTimeUtil()
 
 local ToDoList_UpdateInterval = 1.0
 local ToDoList_TimeSinceLastUpdate = 0.0
@@ -136,87 +139,7 @@ local TDL_AmPmLiterals =
 	[2] = "PM"
 }
 
----------------------------------------------------------------------------------
---Time zone helpers
 
--- Compute the difference in seconds between local time and UTC.
-local function get_timezone()
-  local now = time()
-  return difftime(now, time(date("!*t", now)))
-end
-
--- Return a timezone string in ISO 8601:2000 standard form (+hhmm or -hhmm)
-local function SecondsToHoursMinutes (timezone)
-  local h, m = math.modf(timezone / 3600)
-  return h, 60 * m
-end
-
-local function CurrentTimeZoneString()
-	local timezoneDiff = get_timezone(time())
-	local hourDiff, minuteDiff = SecondsToHoursMinutes(timezoneDiff)
-	minuteDiff = math.abs(minuteDiff)
-	timeZoneStrings =
-	{
-		[-8] = "Pacific",
-		[-7] = "Mountain",
-		[-6] = "Central",
-		[-5] = "Eastern"
-	}
-	local returnString = ""
-	if minuteDiff == 0 and timeZoneStrings[hourDiff] then
-		returnString = returnString..timeZoneStrings[hourDiff]
-	end
-	returnString = returnString.." "..string.format("%+.2d", hourDiff)..":"..string.format("%.2d", minuteDiff).." UTC"
-	return returnString
-end
-
-local monthLengths =
-{
-	[1] = 31,
-	[2] = 28,
-	[3] = 31,
-	[4] = 30,
-	[5] = 31,
-	[6] = 30,
-	[7] = 31,
-	[8] = 31,
-	[9] = 30,
-	[10] = 31,
-	[11] = 30,
-	[12] = 31
-}
-local maxMonthLength = 31
-
-local function AddDays(currentDay, currentMonth, currentYear, daysToAdd)
-	if (currentDay > maxMonthLength or currentMonth > #monthLengths or currentYear < 1) then
-		return -1, -1, -1
-	end
-	newDay = currentDay + daysToAdd
-	newMonth = currentMonth
-	newYear = currentYear
-	if daysToAdd > 0 then
-		while (newDay > monthLengths[newMonth]) do
-			newDay = newDay - monthLengths[newMonth]
-			newMonth = newMonth + 1
-			if (newMonth > #monthLengths) then
-				newMonth = 1
-				newYear = newYear + 1
-			end
-		end
-	else
-		while newDay < 1 do
-			newMonth = newMonth - 1
-			newDay = newDay + monthLengths[newMonth]
-			if newMonth < 0 then
-				newMonth = #monthLengths
-				newYear = newYear - 1
-			end
-		end
-	end
-	return newDay, newMonth, newYear
-end
-
---------------------------------------------------------------------------
 
 TDL:RegisterChatCommand("tdl","InitUI")
 TDL:RegisterChatCommand("todo","InitUI")
@@ -439,7 +362,7 @@ end
 
 function TDL:GetDailyResetTimeNoteGroup()
 	local DailyResetTimeNoteGroup = AceGUI:Create("SimpleGroup")
-	local dailyResetTimeNoteText = "Note: The daily reset time for US servers is 3AM, Pacific Time, -08:00 UTC. All times entered will be in your current time zone, which is "..CurrentTimeZoneString().."."
+	local dailyResetTimeNoteText = "Note: The daily reset time for US servers is 3AM, Pacific Time, -08:00 UTC. All times entered will be in your current time zone, which is "..DateTimeUtil.CurrentTimeZoneString().."."
 	local dailyResetTimeNote = TDL:CreateLabel(dailyResetTimeNoteText, ToDoList_EditPage_DailyResetNoteWidth)
 	DailyResetTimeNoteGroup:AddChild(dailyResetTimeNote)
 	return DailyResetTimeNoteGroup
@@ -642,11 +565,11 @@ function TDL:GetMostRecentResetTime(minutes, hours, days)
 		local daysToCheck = TDL:GetDaysToCheck(currentTimeTable.wday)
 		for i, dayToCheck in ipairs(daysToCheck) do
 			if (days[dayToCheck] == true) then
-				local day, month, year = AddDays(currentTimeTable.day, currentTimeTable.month, currentTimeTable.year, 0 - i)
+				local day, month, year = DateTimeUtil.AddDays(currentTimeTable.day, currentTimeTable.month, currentTimeTable.year, 0 - i)
 				return time{year=year, month=month, day=day, hour=hours, min=minutes}
 			end
 		end
-		local day, month, year = AddDays(currentTimeTable.day, currentTimeTable.month, currentTimeTable.year, -7)
+		local day, month, year = DateTimeUtil.AddDays(currentTimeTable.day, currentTimeTable.month, currentTimeTable.year, -7)
 		return time{year=year, month=month, day=day, hour=hours, min=minutes}
 	end
 end
@@ -733,7 +656,7 @@ function TDL_OnUpdate(self, elapsed)
   ToDoList_TimeSinceLastUpdate = ToDoList_TimeSinceLastUpdate + elapsed;
 
   if (ToDoList_TimeSinceLastUpdate > ToDoList_UpdateInterval) then
-	TDL.timer:SetText("|cffFFFFFF Quests completed ("..GetDailyQuestsCompleted()..") "..SecondsToTime(GetQuestResetTime()).."|r")
+	TDL.timer:SetText("|cffFFFFFF Quests completed ("..GetDailyQuestsCompleted()..") "..DateTimeUtil.SecondsToTime(GetQuestResetTime()).."|r")
     ToDoList_TimeSinceLastUpdate = 0;
     TDL:ResetCompletedTasks()
   end

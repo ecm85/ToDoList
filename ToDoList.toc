@@ -19,6 +19,7 @@ Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
 Libs\LibDBIcon\LibDBIcon-1.0.lua
 Libs\LibCrayon-3.0\lib.xml
 Libs\underscore.lua
+Libs\DateTimeUtil.lua
 ToDoList.lua
 Modules\Tooltips.lua
 Modules\Announcements.lua
