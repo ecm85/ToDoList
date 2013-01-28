@@ -139,8 +139,6 @@ local TDL_AmPmLiterals =
 	[2] = "PM"
 }
 
-
-
 TDL:RegisterChatCommand("tdl","InitUI")
 TDL:RegisterChatCommand("todo","InitUI")
 TDL:RegisterChatCommand("todolist","InitUI")
@@ -156,53 +154,6 @@ function TDL:SetUpDefaultCharValues()
 		["radius"] = 80
 	}
 end
-
-function TDL:InitializeUncreatedChanges()
-	return 
-	{
-		["Character"] = "",
-		["Description"] = "",
-		["Days"] =
-		{
-			[1] = true,
-			[2] = true,
-			[3] = true,
-			[4] = true,
-			[5] = true,
-			[6] = true,
-			[7] = true
-		},
-		["Hours"] = 12,
-		["Minutes"] = 0,
-		["AmPm"] = 1
-	}
-end
-
-function TDL:CloneTask(oldTask)
-	local toReturn = {}
-	TDL:CopyTask(oldTask, toReturn)
-	return toReturn
-end
-
-function TDL:CopyTask(src, dest)
-	dest.Character = src.Character
-	dest.Description = src.Description
-	dest.Days =
-	{
-		[1] = src.Days[1],
-		[2] = src.Days[2],
-		[3] = src.Days[3],
-		[4] = src.Days[4],
-		[5] = src.Days[5],
-		[6] = src.Days[6],
-		[7] = src.Days[7]
-	}
-	dest.Hours = src.Hours
-	dest.Minutes = src.Minutes
-	dest.AmPm = src.AmPm
-	dest.id = src.id
-end
-
 
 function TDL:OnInitialize()
     -- Called when the addon is loaded
@@ -484,8 +435,9 @@ function TDL:DeleteTask(id)
 end
 
 function TDL:AddTask(task, statusTextLabel)
-	local result = TDL:ValidateTask(task, statusTextLabel)
-	if (not result) then
+	local errorMsg = TDL:ValidateTask(task, statusTextLabel)
+	if (errorMsg) then
+		statusTextLabel:SetText(errorMsg)
 		return
 	end
 	local newTask = TDL:CloneTask(task)
@@ -499,7 +451,8 @@ end
 
 function TDL:SaveChangesToTask(task, statusTextLabel)
 	local result = TDL:ValidateTask(task, statusTextLabel)
-	if (not result) then
+	if (result) then
+		statusTextLabel:SetText(errorMsg)
 		return
 	end
 	local taskToUpdate = __.first(__.select(TDL_Database.global.Tasks, function (item) return item.id == task.id end))
@@ -507,30 +460,6 @@ function TDL:SaveChangesToTask(task, statusTextLabel)
 	taskToUpdate.Hours = tonumber(task.Hours)
 	taskToUpdate.Minutes = tonumber(task.Minutes)
 	TDL:ReloadUI(ToDoList_EditPage)
-end
-
-function TDL:ValidateTask(task, statusTextLabel)
-	if task.Description == nil or task.Description == "" then
-		statusTextLabel:SetText("Please enter a description.")
-		return false
-	elseif task.Character == nil or task.Character == "" then
-		statusTextLabel:SetText("Please enter a character to associate with this task.")
-		return false
-	elseif task.AmPm ~= 1 and task.AmPm ~= 2 then
-		statusTextLabel:SetText("Please choose AM or PM.")
-		return false
-	elseif #__.select(task.Days, function (item) return item == true end) == 0 then
-		statusTextLabel:SetText("Please select at least one day for the task.")
-		return false
-	else
-		local hours = tonumber(task.Hours)
-		local minutes = tonumber(task.Minutes)
-		if not hours or hours < 1 or hours > 12  or not minutes or minutes < 0 or minutes > 59 then
-			statusTextLabel:SetText("Please select a valid time.")
-			return false
-		end
-		return true
-	end
 end
 
 function TDL:GetRemainingTasks()
