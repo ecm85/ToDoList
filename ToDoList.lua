@@ -88,6 +88,7 @@ local windowOpen = false
 local tab = 1
 local __ = requireUnderscore()
 local DateTimeUtil = requireDateTimeUtil()
+local Task = requireTask()
 
 local ToDoList_UpdateInterval = 1.0
 local ToDoList_TimeSinceLastUpdate = 0.0
@@ -282,7 +283,7 @@ end
 
 function TDL:GetExistingTasksGroup()
 	local existingTasks = TDL:GetAllTasks()
-	local existingTasksClone = __.map(existingTasks, function(item) return TDL:CloneTask(item) end)
+	local existingTasksClone = __.map(existingTasks, function(item) return item:Clone() end)
 	local dropDownGroup = AceGUI:Create("DropdownGroup")
 	dropDownGroup:SetLayout("Flow")
 	dropDownGroup:SetTitle("Choose an existing task to edit:")
@@ -301,7 +302,7 @@ function TDL:GetExistingTasksGroup()
 end
 
 function TDL:GetAddTaskGroup()
-	local uncreatedChanges = TDL:InitializeUncreatedChanges()
+	local uncreatedChanges = Task:new()
 	local AddTaskGroup = AceGUI:Create("InlineGroup")
 	AddTaskGroup:SetWidth(ToDoList_EditPage_PageWidth)
 	AddTaskGroup:SetTitle("Add a task")
@@ -435,43 +436,43 @@ function TDL:DeleteTask(id)
 end
 
 function TDL:AddTask(task, statusTextLabel)
-	local errorMsg = TDL:ValidateTask(task, statusTextLabel)
+	local errorMsg = task:Validate()
 	if (errorMsg) then
 		statusTextLabel:SetText(errorMsg)
 		return
 	end
-	local newTask = TDL:CloneTask(task)
+	local newTask = task:Clone()
 	task.Hours = tonumber(task.Hours)
 	task.Minutes = tonumber(task.Minutes)
 	task.id = TDL_Database.global.nextId
-	table.insert(TDL_Database.global.Tasks, TDL:CloneTask(task))
+	table.insert(TDL_Database.global.Tasks, task:Clone())
 	TDL_Database.global.nextId = TDL_Database.global.nextId + 1
 	TDL:ReloadUI(ToDoList_EditPage)
 end
 
 function TDL:SaveChangesToTask(task, statusTextLabel)
-	local result = TDL:ValidateTask(task, statusTextLabel)
+	local result = task:Validate()
 	if (result) then
 		statusTextLabel:SetText(errorMsg)
 		return
 	end
 	local taskToUpdate = __.first(__.select(TDL_Database.global.Tasks, function (item) return item.id == task.id end))
-	TDL:CopyTask(task, taskToUpdate)
+	Task.Copy(task, taskToUpdate)
 	taskToUpdate.Hours = tonumber(task.Hours)
 	taskToUpdate.Minutes = tonumber(task.Minutes)
 	TDL:ReloadUI(ToDoList_EditPage)
 end
 
 function TDL:GetRemainingTasks()
-	return __.select(TDL_Database.global.Tasks, function(task) return not task["LastCompleted"] end)
+	return __.each(__.select(TDL_Database.global.Tasks, function(task) return not task["LastCompleted"] end), function (task) return Task:new(task) end)
 end
 
 function TDL:GetCompletedTasks()
-	return __.select(TDL_Database.global.Tasks, function(task) return task["LastCompleted"] end)
+	return __.each(__.select(TDL_Database.global.Tasks, function(task) return task["LastCompleted"] end), function (task) return Task:new(task) end)
 end
 
 function TDL:GetAllTasks()
-	return TDL_Database.global.Tasks
+	return __.each(TDL_Database.global.Tasks, function (task) return Task:new(task) end)
 end
 
 function TDL:GetDaysToCheck(today)
