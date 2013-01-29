@@ -3,7 +3,6 @@
 --unit tests
 --Move all data access out
 --Consolidate id's on login
---Move all task-related things to Task
 --Move static things into other files
 
 --feature todos:
