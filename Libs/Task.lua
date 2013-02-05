@@ -34,7 +34,7 @@ function requireTask()
 	end
 
 	function Task:Clone()
-		local toReturn = {}
+		local toReturn = Task:new({})
 		Task.Copy(self, toReturn)
 		return toReturn
 	end

@@ -1,7 +1,6 @@
 --Mod todos:
 --js lint equiv
 --unit tests
---Move all data access out
 --Consolidate id's on login
 --Move static things into other files
 
@@ -86,6 +85,7 @@ end
 local windowOpen = false
 local tab = 1
 local __ = requireUnderscore()
+
 local DateTimeUtil = requireDateTimeUtil()
 local Task = requireTask()
 
@@ -143,28 +143,11 @@ TDL:RegisterChatCommand("tdl","InitUI")
 TDL:RegisterChatCommand("todo","InitUI")
 TDL:RegisterChatCommand("todolist","InitUI")
 
-function TDL:SetUpDefaultCharValues()
-	TDL_Database.char.hasDefaults = true
-	TDL_Database.char.showMinimapIcon = true
-	TDL_Database.char.announceMethod = 1
-	TDL_Database.char.minimapIcon =
-	{
-		["hide"] = false,
-		["minimapPos"] = 220,
-		["radius"] = 80
-	}
-end
+taskDataBridge = requireTaskDataBridge()
 
 function TDL:OnInitialize()
     -- Called when the addon is loaded
-    TDL_Database = LibStub("AceDB-3.0"):New("ToDoListDB",defaults)
-    if (not TDL_Database.char.hasDefaults) then
-		TDL:SetUpDefaultCharValues()
-	end
-	if (not TDL_Database.global.Tasks) then
-		TDL_Database.global.Tasks = {}
-		TDL_Database.global.nextId = 0
-	end
+    taskDataBridge.Initialize()
     TDL:CreateMinimapButton()
 end
 
@@ -227,7 +210,7 @@ function TDL:GetRemainingTasksGroup()
 	local ButtonLabel = TDL:CreateColoredLabel(" Mark Completed:", ToDoList_TaskPage_ButtonColumnWidth, 0, 1, 0)
 	RemainingTasksGroup:AddChild(ButtonLabel)
 
-	local remainingTasks = TDL:GetRemainingTasks()
+	local remainingTasks = taskDataBridge:GetRemainingTasks()
 	for i, task in ipairs(remainingTasks) do
 		local characterLabel = TDL:CreateLabel(task["Character"], ToDoList_TaskPage_CharacterColumnWidth)
 		local taskLabel = TDL:CreateLabel(task["Description"], ToDoList_TaskPage_DescriptionColumnWidth)
@@ -266,7 +249,7 @@ function TDL:GetCompletedTasksGroup()
 	CompletedTasksGroup:AddChild(BlankLabel)
 
 
-	local completedTasks = TDL:GetCompletedTasks()
+	local completedTasks = taskDataBridge:GetCompletedTasks()
 	for i, task in ipairs(completedTasks) do
 		local characterLabel = TDL:CreateLabel(task["Character"], ToDoList_TaskPage_CharacterColumnWidth)
 		local taskLabel = TDL:CreateLabel(task["Description"], ToDoList_TaskPage_DescriptionColumnWidth)
@@ -281,7 +264,7 @@ function TDL:GetCompletedTasksGroup()
 end
 
 function TDL:GetExistingTasksGroup()
-	local existingTasks = TDL:GetAllTasks()
+	local existingTasks = taskDataBridge:GetAllTasks()
 	local existingTasksClone = __.map(existingTasks, function(item) return item:Clone() end)
 	local dropDownGroup = AceGUI:Create("DropdownGroup")
 	dropDownGroup:SetLayout("Flow")
@@ -429,88 +412,37 @@ function TDL:AddSingleTaskToGroup(task, group, buttonSetupCB)
 
 end
 
-function TDL:DeleteTask(id)
-	TDL_Database.global.Tasks = __.reject(TDL_Database.global.Tasks, function (task) return task["id"] == id end)
-	TDL:ReloadUI(ToDoList_EditPage)
-end
-
-function TDL:AddTask(task, statusTextLabel)
-	local errorMsg = task:Validate()
-	if (errorMsg) then
-		statusTextLabel:SetText(errorMsg)
-		return
-	end
-	local newTask = task:Clone()
-	task.Hours = tonumber(task.Hours)
-	task.Minutes = tonumber(task.Minutes)
-	task.id = TDL_Database.global.nextId
-	table.insert(TDL_Database.global.Tasks, task:Clone())
-	TDL_Database.global.nextId = TDL_Database.global.nextId + 1
-	TDL:ReloadUI(ToDoList_EditPage)
-end
-
-function TDL:SaveChangesToTask(task, statusTextLabel)
-	local result = task:Validate()
-	if (result) then
-		statusTextLabel:SetText(errorMsg)
-		return
-	end
-	local taskToUpdate = __.first(__.select(TDL_Database.global.Tasks, function (item) return item.id == task.id end))
-	Task.Copy(task, taskToUpdate)
-	taskToUpdate.Hours = tonumber(task.Hours)
-	taskToUpdate.Minutes = tonumber(task.Minutes)
-	TDL:ReloadUI(ToDoList_EditPage)
-end
-
-function TDL:GetRemainingTasks()
-	return __.each(__.select(TDL_Database.global.Tasks, function(task) return not task["LastCompleted"] end), function (task) return Task:new(task) end)
-end
-
-function TDL:GetCompletedTasks()
-	return __.each(__.select(TDL_Database.global.Tasks, function(task) return task["LastCompleted"] end), function (task) return Task:new(task) end)
-end
-
-function TDL:GetAllTasks()
-	return __.each(TDL_Database.global.Tasks, function (task) return Task:new(task) end)
-end
-
-function TDL:GetDaysToCheck(today)
-	local toReturn = {}
-	for i=today - 1,1, -1 do
-		table.insert(toReturn, i)
-	end
-	for i=7, today + 1,-1 do
-		table.insert(toReturn, i)
-	end
-	return toReturn
-end
-
-function TDL:GetMostRecentResetTime(minutes, hours, days)
-	local currentTimeTable = date("*t")
-	--check if one has elapsed today, then the rest of the week, then a week ago today
-	if (days[currentTimeTable.wday] == true and (currentTimeTable.hour > hours or (currentTimeTable.hour == hours and currentTimeTable.min > minutes))) then
-		return time{year=currentTimeTable.year, month=currentTimeTable.month, day=currentTimeTable.day, hour=hours, min=minutes}
+function TDL:AddTask(id, statusTextLabel)
+	local response = taskDataBridge.AddTask(id)
+	if (response) then
+		statusTextLabel:SetText(response)
 	else
-		local daysToCheck = TDL:GetDaysToCheck(currentTimeTable.wday)
-		for i, dayToCheck in ipairs(daysToCheck) do
-			if (days[dayToCheck] == true) then
-				local day, month, year = DateTimeUtil.AddDays(currentTimeTable.day, currentTimeTable.month, currentTimeTable.year, 0 - i)
-				return time{year=year, month=month, day=day, hour=hours, min=minutes}
-			end
-		end
-		local day, month, year = DateTimeUtil.AddDays(currentTimeTable.day, currentTimeTable.month, currentTimeTable.year, -7)
-		return time{year=year, month=month, day=day, hour=hours, min=minutes}
+		TDL:ReloadUI(ToDoList_EditPage)
 	end
+end
+
+function TDL:SaveChangesToTask(task)
+	local response = taskDataBridge.SaveChangesToTask(task)
+	if (response) then
+		statusTextLabel:SetText(errorMsg)
+	else
+		TDL:ReloadUI(ToDoList_EditPage)
+	end
+end
+
+function TDL:DeleteTask(id)
+	taskDataBridge.DeleteTask(id)
+	TDL:ReloadUI(ToDoList_EditPage)
 end
 
 function TDL:ResetCompletedTasks()
-	local completedTasks = TDL:GetCompletedTasks()
+	local completedTasks = taskDataBridge:GetCompletedTasks()
 	for i, task in ipairs(completedTasks) do
 		local hours = task.Hours
 		if (task.AmPm == 2) then
 			hours = hours + 12
 		end
-		local mostRecentResetTime = TDL:GetMostRecentResetTime(task.Minutes, hours, task.Days)
+		local mostRecentResetTime = DateTimeUtil.GetMostRecentResetTime(task.Minutes, hours, task.Days)
 		if mostRecentResetTime > task["LastCompleted"] then task["LastCompleted"] = nil end
 	end
 end
@@ -570,11 +502,11 @@ function TDL:ReloadUI(selectedTab)
 end
 
 function TDL:CreateMinimapButton()
-	TDL.LDBIcon:Register("TDL", TDLLauncher, TDL_Database.char.minimapIcon)
+	TDL.LDBIcon:Register("TDL", TDLLauncher, taskDataBridge.GetCharInfo().minimapIcon)
 end
 
 function TDL:ResetData()
-	TDL_Database:ResetDB()
+	taskDataBridge.ResetDB()
 	collectgarbage()
 
 	TDL.LDBIcon:Show("TDL")

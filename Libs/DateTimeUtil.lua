@@ -51,7 +51,7 @@ function requireDateTimeUtil ()
 	}
 	local maxMonthLength = 31
 
-	function dateTimeUtil.AddDays(currentDay, currentMonth, currentYear, daysToAdd)
+	local function AddDays(currentDay, currentMonth, currentYear, daysToAdd)
 		if (currentDay > maxMonthLength or currentMonth > #monthLengths or currentYear < 1) then
 			return -1, -1, -1
 		end
@@ -79,6 +79,35 @@ function requireDateTimeUtil ()
 		end
 		return newDay, newMonth, newYear
 	end
+
+	local function GetDaysToCheck(today)
+		local toReturn = {}
+		for i=today - 1,1, -1 do
+			table.insert(toReturn, i)
+		end
+		for i=7, today + 1,-1 do
+			table.insert(toReturn, i)
+		end
+		return toReturn
+	end
+
+	function dateTimeUtil.GetMostRecentResetTime(minutes, hours, days)
+	local currentTimeTable = date("*t")
+	--check if one has elapsed today, then the rest of the week, then a week ago today
+	if (days[currentTimeTable.wday] == true and (currentTimeTable.hour > hours or (currentTimeTable.hour == hours and currentTimeTable.min > minutes))) then
+		return time{year=currentTimeTable.year, month=currentTimeTable.month, day=currentTimeTable.day, hour=hours, min=minutes}
+	else
+		local daysToCheck = GetDaysToCheck(currentTimeTable.wday)
+		for i, dayToCheck in ipairs(daysToCheck) do
+			if (days[dayToCheck] == true) then
+				local day, month, year = AddDays(currentTimeTable.day, currentTimeTable.month, currentTimeTable.year, 0 - i)
+				return time{year=year, month=month, day=day, hour=hours, min=minutes}
+			end
+		end
+		local day, month, year = AddDays(currentTimeTable.day, currentTimeTable.month, currentTimeTable.year, -7)
+		return time{year=year, month=month, day=day, hour=hours, min=minutes}
+	end
+end
 
 	return dateTimeUtil
 end
