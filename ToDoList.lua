@@ -6,30 +6,52 @@
 
 --feature todos:
 --tracking pane
+--	Show +/- button per character
+--	Option: Only show for this character (currently logged in)
+--	Show description for each task
+--	Show red X for incomplete, green check for complete
+--  On tooltip, for incomplete, show reset time, for completed, show when completed
+--  On tooltip, message 'Click to toggle completed/uncompleted'
+--  Option: Show tracking frame
+--	Option: Lock tracking frame
 --change remaining task view to show 'next reset time/day' in # hours?
 --pretty-up completed task view - times/format, show  reset time?
 --Disable edit button until and after changes are made, and create button?
 --sort tasks/allow sorting by character/name/reset time?
+--Set up default tab to be second tab if no tasks created
 
 --Future features:
 --Allow time zone changing (enter task in one tz, then log in while in another)
 --Allow to recant 'completion' if misclick etc
-
 TDL = LibStub("AceAddon-3.0"):NewAddon("TDL", "AceConsole-3.0", "AceEvent-3.0", "AceHook-3.0")
-
 local QTip = LibStub('LibQTip-1.0')
 local AceGUI = LibStub("AceGUI-3.0")
 TDL.LDBIcon = LibStub("LibDBIcon-1.0")
-
+local taskDataBridge = requireTaskDataBridge()
+ToDoListDB = taskDataBridge.GetDataConnection()
 local TDLLauncher = LibStub("LibDataBroker-1.1", true):NewDataObject("TDL", {
 	type = "launcher",
 	icon = "Interface\\Icons\\inv_scroll_09",
-	OnClick = function() TDL:InitUI() end,
+	OnClick = function(_,button) -- fires when a user clicks on the minimap icon
+			local char = taskDataBridge.GetCharInfo()
+			if button == "RightButton" then
+				char.showTrackingFrame = not char.showTrackingFrame
+				if char.showTrackingFrame then
+					TDL.TrackingFrame:Show()
+				else
+					TDL.TrackingFrame:Hide()
+				end
+			else
+				TDL:InitUI()
+			end
+		end,
 	OnTooltipShow = function(tt) -- tooltip that shows when you hover over the minimap icon
 			local cs = "|cffffffcc"
 			local ce = "|r"
 			tt:AddLine("To-Do List")
-			tt:AddLine(string.format("%sClick%s to open the configuration window", cs, ce))
+			tt:AddLine(string.format("%sLeft-Click%s to open the configuration window", cs, ce))
+			tt:AddLine(string.format("%sRight-Click%s to hide/show the tracking window", cs, ce))
+			tt:AddLine(string.format("%sDrag%s to move this button", cs, ce))
 		end,
 	})
 
@@ -56,6 +78,12 @@ function TDL:CreateTextBox(text, width, cbMethod, cb, buttonDisabled)
 	textBox:DisableButton(buttonDisabled)
 
 	return textBox
+end
+
+function TDL:CreateBoundedTextBox(text, width, cbMethod, cb, buttonDisabled, maxWidth)
+	local textbox = TDL:CreateTextBox(text, width, cbMethod, cb, buttonDisabled)
+	textbox:SetMaxLetters(maxWidth)
+	return textbox
 end
 
 function TDL:CreateCheckbox(text, width, defaultValue, cb)
@@ -142,18 +170,22 @@ local TDL_AmPmLiterals =
 TDL:RegisterChatCommand("tdl","InitUI")
 TDL:RegisterChatCommand("todo","InitUI")
 TDL:RegisterChatCommand("todolist","InitUI")
+TDL:RegisterChatCommand("tdl-reset", "ResetTrackingFrame")
+TDL:RegisterChatCommand("todo-reset", "ResetTrackingFrame")
+TDL:RegisterChatCommand("todolist-reset", "ResetTrackingFrame")
 
-taskDataBridge = requireTaskDataBridge()
 
 function TDL:OnInitialize()
     -- Called when the addon is loaded
     taskDataBridge.Initialize()
     TDL:CreateMinimapButton()
+    TDL:CreateTrackingFrame()
 end
 
 function TDL:OnEnable()
 	-- Called when the addon is enabled
 	self:Print("To-Do List enabled. /todo to configure.")
+	TDL:ReloadTrackingFrame()
 end
 
 function TDL:DrawTaskTab(container)
@@ -356,45 +388,20 @@ function TDL:AddSingleTaskToGroup(task, group, buttonSetupCB)
 	group:AddChild(ExpirationLabel)
 
 	local characterTextBox = TDL:CreateTextBox(
-		task["Character"],
-		ToDoList_EditPage_CharacterColumnWidth,
-		"OnTextChanged",
-		function (_, _, newValue) task.Character = newValue end,
-		true)
+		task["Character"], ToDoList_EditPage_CharacterColumnWidth,
+		"OnTextChanged", function (_, _, newValue) task.Character = newValue end, true)
 	local descriptionTextBox = TDL:CreateTextBox(
-		task["Description"],
-		ToDoList_EditPage_DescriptionColumnWidth,
-		"OnTextChanged",
-		function (_, _, newValue) task.Description = newValue end,
-		true)
+		task["Description"], ToDoList_EditPage_DescriptionColumnWidth,
+		"OnTextChanged", function (_, _, newValue) task.Description = newValue end, true)
 	group:AddChild(characterTextBox)
 	group:AddChild(descriptionTextBox)
-	local checkboxGroup = AceGUI:Create("SimpleGroup")
-	checkboxGroup:SetLayout("Flow")
-	checkboxGroup:SetWidth(ToDoList_EditPage_CheckboxGroupWidth)
-	for i, dayInitial in ipairs(TDL_DayInitials) do
-		local checkbox = TDL:CreateCheckbox(
-			dayInitial,
-			ToDoList_EditPage_DayCheckboxWidth,
-			task["Days"][i],
-			function(_, _, newValue) task.Days[i] = newValue end)
-		checkboxGroup:AddChild(checkbox)
-	end
-	group:AddChild(checkboxGroup)
-	local HoursTextbox = TDL:CreateTextBox(
-		string.format("%.2d", task["Hours"]),
-		ToDoList_EditPage_HourTextboxWidth,
-		"OnTextChanged",
-		function (_, _, newValue) task.Hours = newValue end,
-		true)
-	HoursTextbox:SetMaxLetters(2)
-	local MinutesTextBox = TDL:CreateTextBox(
-		string.format("%.2d", task["Minutes"]),
-		ToDoList_EditPage_MinutesTextboxWidth,
-		"OnTextChanged",
-		function (_, _, newValue) task.Minutes = newValue end,
-		true)
-	MinutesTextBox:SetMaxLetters(2)
+	group:AddChild(TDL:CreateDaysCheckboxGroup(task))
+	local HoursTextbox = TDL:CreateBoundedTextBox(
+		string.format("%.2d", task["Hours"]), ToDoList_EditPage_HourTextboxWidth,
+		"OnTextChanged", function (_, _, newValue) task.Hours = newValue end, true, 2)
+	local MinutesTextBox = TDL:CreateBoundedTextBox(
+		string.format("%.2d", task["Minutes"]), ToDoList_EditPage_MinutesTextboxWidth,
+		"OnTextChanged", function (_, _, newValue) task.Minutes = newValue end,  true, 2)
 	local AmPmDropdown = TDL:CreateDropdown(TDL_AmPmLiterals,
 		ToDoList_EditPage_AmPmDropdownWidth,
 		function(_, _, newSelected) task.AmPm = newSelected end)
@@ -410,6 +417,21 @@ function TDL:AddSingleTaskToGroup(task, group, buttonSetupCB)
 
 	group:AddChild(statusTextLabel)
 
+end
+
+function TDL:CreateDaysCheckboxGroup(task)
+	local checkboxGroup = AceGUI:Create("SimpleGroup")
+	checkboxGroup:SetLayout("Flow")
+	checkboxGroup:SetWidth(ToDoList_EditPage_CheckboxGroupWidth)
+	for i, dayInitial in ipairs(TDL_DayInitials) do
+		local checkbox = TDL:CreateCheckbox(
+			dayInitial,
+			ToDoList_EditPage_DayCheckboxWidth,
+			task["Days"][i],
+			function(_, _, newValue) task.Days[i] = newValue end)
+		checkboxGroup:AddChild(checkbox)
+	end
+	return checkboxGroup
 end
 
 function TDL:AddTask(id, statusTextLabel)
@@ -508,16 +530,16 @@ end
 function TDL:ResetData()
 	taskDataBridge.ResetDB()
 	collectgarbage()
-
 	TDL.LDBIcon:Show("TDL")
+	TDL:ReloadTrackingFrame()
 	TDL:CheckPlayerData()
 end
 
-function TDL_OnUpdate(self, elapsed)
+function TDL_UpdateTrackingFrame(self, elapsed)
   ToDoList_TimeSinceLastUpdate = ToDoList_TimeSinceLastUpdate + elapsed;
 
   if (ToDoList_TimeSinceLastUpdate > ToDoList_UpdateInterval) then
-	TDL.timer:SetText("|cffFFFFFF Quests completed ("..GetDailyQuestsCompleted()..") "..DateTimeUtil.SecondsToTime(GetQuestResetTime()).."|r")
+	TDL.timer:SetText("|cffFFFFFF Quests completed ("..GetDailyQuestsCompleted()..") "..SecondsToTime(GetQuestResetTime()).."|r")
     ToDoList_TimeSinceLastUpdate = 0;
     TDL:ResetCompletedTasks()
   end
@@ -564,4 +586,86 @@ function TDL:SafelyPrintTable(var, indentation)
 			self:Print(prefix..tostring(k).." "..tostring(v))
 		end
 	end
+end
+
+function TDL:CreateTrackingFrame()
+	local char = taskDataBridge.GetCharInfo()
+	TDL.TrackingFrame = CreateFrame("Frame","TrackingFrame",UIParent)
+	TDL.TrackingFrame:SetMovable(true)
+	TDL.TrackingFrame:EnableMouse(true)
+	TDL.TrackingFrame:SetClampedToScreen(true)
+	TDL.TrackingFrame:RegisterForDrag("LeftButton")
+	TDL.TrackingFrame:SetScript("OnUpdate",TDL_UpdateTrackingFrame)
+	TDL.TrackingFrame:SetScript("OnDragStart", TDL.TrackingFrame.StartMoving)
+	TDL.TrackingFrame:SetScript("OnDragStop", TDL.TrackingFrame.StopMovingOrSizing)
+	TDL.TrackingFrame:SetBackdropColor(0,0,0,1);
+	TDL.TrackingFrame:SetHeight(200)
+	TDL.TrackingFrame:SetWidth(300)
+	TDL.TrackingFrame:SetAlpha(1.0)
+
+	local title = TDL.TrackingFrame:CreateFontString("TitleText",nil,"GameFontNormalLarge")
+	title:SetText("|cff7FFF00To-Do List|r")
+	title:SetPoint("TOPLEFT",TDL.TrackingFrame,"TOPLEFT",-4,-ypos)
+	title:Show()
+	ypos = ypos + 18
+
+	--Display the completed quests and countdown time
+	TDL.timer = TDL.TrackingFrame:CreateFontString("TimerText",nil,"GameFontNormal")
+	TDL.timer:SetText("|cffFFFFFF Quests completed ("..GetDailyQuestsCompleted()..") "..SecondsToTime(GetQuestResetTime()).."|r")
+	TDL.timer:SetPoint("TOPLEFT",TDL.TrackingFrame,"TOPLEFT",5,-ypos)
+	TDL.timer:Show()
+
+	ypos = ypos + 14
+
+	TDL.TrackingFrame:SetHeight(32)
+    local xO,yO = char.TrackingFramePos[1], char.TrackingFramePos[2]
+    TDL.TrackingFrame:SetPoint( char.TrackingFramePos[3],nil, char.TrackingFramePos[3],xO,yO-(TDL.TrackingFrame:GetHeight()/2))
+
+    collectgarbage()
+
+
+    if not char.showTrackingFrame then
+		TDL.TrackingFrame:Hide()
+	else
+		TDL.TrackingFrame:Show()
+	end
+
+	if char.lockTrackingFrame then
+		TDL.TrackingFrame:SetMovable(false)
+		TDL.TrackingFrame:EnableMouse(false)
+    else
+		TDL.TrackingFrame:SetMovable(true)
+		TDL.TrackingFrame:EnableMouse(true)
+    end
+
+end
+
+function TDL:ReloadTrackingFrame()
+	local char = taskDataBridge.GetCharInfo()
+	local point, relativeTo, relativePoint, xOfs, yOfs = TDL.TrackingFrame:GetPoint()
+	char.TrackingFramePos[1] = xOfs
+    char.TrackingFramePos[2] = yOfs+(TDL.TrackingFrame:GetHeight()/2)
+	char.TrackingFramePos[3] = point
+
+	TDL.TrackingFrame:Hide()
+	TDL.TrackingFrame = nil
+	collectgarbage()
+
+	TDL:CreateTrackingFrame()
+end
+
+function TDL:ResetTrackingFrame()
+	local char = taskDataBridge.GetCharInfo()
+	char.TrackingFramePos =
+	{
+		[1] = 0,
+		[2] = 0,
+		[3] = "CENTER"
+	}
+
+	TDL.TrackingFrame:Hide()
+	TDL.TrackingFrame = nil
+	collectgarbage()
+
+	TDL:CreateTrackingFrame()
 end

@@ -25,4 +25,3 @@ Libs\TaskDataBridge.lua
 
 ToDoList.lua
 Modules\Tooltips.lua
-Modules\Announcements.lua
