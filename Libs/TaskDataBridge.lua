@@ -4,15 +4,21 @@ function requireTaskDataBridge()
 	local Task = requireTask()
 
 	local function SetUpDefaultCharValues(TDL_Database)
+		print("Setting up defaults")
 		TDL_Database.char.hasDefaults = true
-		TDL_Database.char.showMinimapIcon = true
-		TDL_Database.char.announceMethod = 1
+		TDL_Database.char.showTrackingFrame = false
 		TDL_Database.char.minimapIcon =
 		{
-			["hide"] = false,
 			["minimapPos"] = 220,
 			["radius"] = 80
 		}
+		TDL_Database.char.TrackingFramePos =
+		{
+			[1] = 0,
+			[2] = 0,
+			[3] = "CENTER"
+		}
+		TDL_Database.char.lockTrackingFrame = false
 	end
 
 	local taskDataBridge = {}
@@ -77,6 +83,10 @@ function requireTaskDataBridge()
 
 	function taskDataBridge.GetCharInfo()
 		return TDL_Database.char
+	end
+
+	function taskDataBridge.GetDataConnection()
+		return TDL_Database
 	end
 
 	return taskDataBridge
