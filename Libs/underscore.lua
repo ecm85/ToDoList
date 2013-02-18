@@ -149,6 +149,24 @@ function requireUnderscore()
 		return false
 	end
 
+	function Underscore.funcs.uniq(list, sorted, iterator)
+		local initial, seen = list, {}
+
+		if iterator then
+		  initial = Underscore.funcs.map(list, iterator)
+		end
+		for index, value in pairs(initial) do
+			--print(value)
+			--print(index)
+			--print(Underscore.funcs.include(seen, value))
+			--print(list[index])
+			if (sorted and (index==1 or seen[#seen]~=value)) or (not Underscore.funcs.include(seen, value)) then
+				table.insert(seen, value)
+			end
+		end
+		return seen
+	end
+
 	function Underscore.funcs.include(list, value)
 		for i in Underscore.iter(list) do
 		   	if i == value then return true end

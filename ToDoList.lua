@@ -3,26 +3,28 @@
 --unit tests
 --Consolidate id's on login
 --Move static things into other files
+--Move tracking pane, main pane into own files
 
 --feature todos:
 --tracking pane
---	Show +/- button per character
---	Option: Only show for this character (currently logged in)
---	Show description for each task
---	Show red X for incomplete, green check for complete
 --  On tooltip, for incomplete, show reset time, for completed, show when completed
 --  On tooltip, message 'Click to toggle completed/uncompleted'
 --  Option: Show tracking frame
 --	Option: Lock tracking frame
+--	Option: Only show for this character (currently logged in)
+--	Option: Only show remaining tasks
+--	Add in group by and replace uniq
+--	Refresh tracking pane and main app when either changes in a coherent way
 --change remaining task view to show 'next reset time/day' in # hours?
 --pretty-up completed task view - times/format, show  reset time?
 --Disable edit button until and after changes are made, and create button?
 --sort tasks/allow sorting by character/name/reset time?
 --Set up default tab to be second tab if no tasks created
+--Add 'uncompleted' button to main pane
 
 --Future features:
 --Allow time zone changing (enter task in one tz, then log in while in another)
---Allow to recant 'completion' if misclick etc
+
 TDL = LibStub("AceAddon-3.0"):NewAddon("TDL", "AceConsole-3.0", "AceEvent-3.0", "AceHook-3.0")
 local QTip = LibStub('LibQTip-1.0')
 local AceGUI = LibStub("AceGUI-3.0")
@@ -147,10 +149,16 @@ local ToDoList_EditPage_AddButtonsExtenderWidth = ToDoList_EditPage_PageWidth - 
 local ToDoList_EditPage_EditButtonsExtenderWidth = ToDoList_EditPage_PageWidth - (ToDoList_EditPage_ButtonWidth * 2)
 local ToDoList_EditPage_TaskSelectionDropdownWidth = 400
 
+local ToDoList_TrackingPane_HeaderHeight = 18
+local ToDOList_TrackingPane_MessageHeight = 14
+
 local ToDoList_TaskPage = 1
 local ToDoList_EditPage = 2
 
-local TDL_DayInitials =
+local TDL_TaskCompleted_Texture = "Interface\\RAIDFRAME\\ReadyCheck-Ready.blp"
+local TDL_TaskRemaining_Texture = "Interface\\RAIDFRAME\\ReadyCheck-NotReady.blp"
+
+TDL_DayInitials =
 {
 	[1] = "Su",
 	[2] = "Mo",
@@ -161,7 +169,7 @@ local TDL_DayInitials =
 	[7] = "Sa"
 }
 
-local TDL_AmPmLiterals =
+TDL_AmPmLiterals =
 {
 	[1] = "AM",
 	[2] = "PM"
@@ -248,8 +256,8 @@ function TDL:GetRemainingTasksGroup()
 		local taskLabel = TDL:CreateLabel(task["Description"], ToDoList_TaskPage_DescriptionColumnWidth)
 		local expirationGroup = AceGUI:Create("SimpleGroup")
 		expirationGroup:SetWidth(ToDoList_TaskPage_DateTimeColumnWidth)
-		local expirationDaysLabel = TDL:CreateLabel(TDL:GetExpirationDaysString(task["Days"]), ToDoList_TaskPage_DateTimeColumnWidth)
-		local expirationTimeLabel = TDL:CreateLabel(TDL:GetExpirationTimeString(task["Hours"], task["Minutes"], task["AmPm"]), ToDoList_TaskPage_DateTimeColumnWidth)
+		local expirationDaysLabel = TDL:CreateLabel(task:GetExpirationDaysString(), ToDoList_TaskPage_DateTimeColumnWidth)
+		local expirationTimeLabel = TDL:CreateLabel(task:GetExpirationTimeString(), ToDoList_TaskPage_DateTimeColumnWidth)
 		expirationGroup:AddChild(expirationDaysLabel)
 		expirationGroup:AddChild(expirationTimeLabel)
 		local markCompletedButton = TDL:CreateButton(
@@ -279,7 +287,6 @@ function TDL:GetCompletedTasksGroup()
 	CompletedTasksGroup:AddChild(DescriptionLabel)
 	CompletedTasksGroup:AddChild(ExpirationLabel)
 	CompletedTasksGroup:AddChild(BlankLabel)
-
 
 	local completedTasks = taskDataBridge:GetCompletedTasks()
 	for i, task in ipairs(completedTasks) do
@@ -474,6 +481,14 @@ function TDL:SetTaskCompleted (task)
 	TDL:ReloadUI(ToDoList_TaskPage)
 end
 
+function TDL:ToggleTaskCompleted(task)
+	if (task["LastCompleted"]) then
+		task["LastCompleted"] = nil
+	else
+		task["LastCompleted"] = time()
+	end
+end
+
 local function SelectTab(container,event,tab)
 	TDL:ResetCompletedTasks()
 	container:ReleaseChildren()
@@ -539,29 +554,12 @@ function TDL_UpdateTrackingFrame(self, elapsed)
   ToDoList_TimeSinceLastUpdate = ToDoList_TimeSinceLastUpdate + elapsed;
 
   if (ToDoList_TimeSinceLastUpdate > ToDoList_UpdateInterval) then
-	TDL.timer:SetText("|cffFFFFFF Quests completed ("..GetDailyQuestsCompleted()..") "..SecondsToTime(GetQuestResetTime()).."|r")
+	TDL.CompletedDailiesCounter:SetText("Daily Quests completed today: "..GetDailyQuestsCompleted())
+	TDL.DailiesResetTimer:SetText("Dailies reset in "..SecondsToTime(GetQuestResetTime()))
     ToDoList_TimeSinceLastUpdate = 0;
     TDL:ResetCompletedTasks()
   end
 
-end
-
-function TDL:GetExpirationDaysString(days)
-	local toReturn = ""
-	for i, day in ipairs(days) do
-		day = days[i]
-		if (day) then
-			if (toReturn ~= "") then
-				toReturn = toReturn.." "
-			end
-			toReturn = toReturn..TDL_DayInitials[i]
-		end
-	end
-	return toReturn
-end
-
-function TDL:GetExpirationTimeString(hours, minutes, ampm)
-	return string.format("%.2d", hours)..":"..string.format("%.2d", minutes).." "..TDL_AmPmLiterals[ampm]
 end
 
 --breaks if tables are keys to other tables, but not if tables are values in other tables
@@ -602,20 +600,116 @@ function TDL:CreateTrackingFrame()
 	TDL.TrackingFrame:SetHeight(200)
 	TDL.TrackingFrame:SetWidth(300)
 	TDL.TrackingFrame:SetAlpha(1.0)
+	local ypos = 0
 
 	local title = TDL.TrackingFrame:CreateFontString("TitleText",nil,"GameFontNormalLarge")
 	title:SetText("|cff7FFF00To-Do List|r")
-	title:SetPoint("TOPLEFT",TDL.TrackingFrame,"TOPLEFT",-4,-ypos)
+	title:SetPoint("TOPLEFT",TDL.TrackingFrame,"TOPLEFT",0,-ypos)
 	title:Show()
-	ypos = ypos + 18
+	ypos = ypos + ToDoList_TrackingPane_HeaderHeight
 
 	--Display the completed quests and countdown time
-	TDL.timer = TDL.TrackingFrame:CreateFontString("TimerText",nil,"GameFontNormal")
-	TDL.timer:SetText("|cffFFFFFF Quests completed ("..GetDailyQuestsCompleted()..") "..SecondsToTime(GetQuestResetTime()).."|r")
-	TDL.timer:SetPoint("TOPLEFT",TDL.TrackingFrame,"TOPLEFT",5,-ypos)
-	TDL.timer:Show()
+	TDL.CompletedDailiesCounter = TDL.TrackingFrame:CreateFontString("CompletedDailiesCounter", nil, "GameFontWhite")
+	TDL.CompletedDailiesCounter:SetText("Daily Quests completed today: "..GetDailyQuestsCompleted())
+	TDL.CompletedDailiesCounter:SetPoint("TOPLEFT",TDL.TrackingFrame,"TOPLEFT",0,-ypos)
+	TDL.CompletedDailiesCounter:Show()
+	ypos = ypos + ToDOList_TrackingPane_MessageHeight
 
-	ypos = ypos + 14
+	TDL.DailiesResetTimer = TDL.TrackingFrame:CreateFontString("DailiesResetTimer",nil,"GameFontWhite")
+	TDL.DailiesResetTimer:SetText("Dailies reset in "..SecondsToTime(GetQuestResetTime()))
+	TDL.DailiesResetTimer:SetPoint("TOPLEFT",TDL.TrackingFrame,"TOPLEFT",0,-ypos)
+	TDL.DailiesResetTimer:Show()
+	ypos = ypos + ToDOList_TrackingPane_MessageHeight
+
+	local iterator = function (v) return v.Character end
+	local uniqueCharacters = __.uniq(taskDataBridge.GetAllTasks(), false, iterator)
+
+	for i, character in ipairs(uniqueCharacters) do
+		--self:Print(character)
+
+		local expandButton = CreateFrame("Button",nil,TDL.TrackingFrame,"OptionsButtonTemplate")
+		if char.trackerCharacterExpanded[character] then
+			expandButton:SetText("--")
+		else
+			expandButton:SetText("+")
+		end
+		expandButton:SetWidth(20)
+		expandButton:SetHeight(20)
+		expandButton:SetAlpha(1)
+		expandButton:SetPoint("TOPLEFT",TDL.TrackingFrame,"TOPLEFT", 0,-ypos-2)
+		expandButton:SetScript("OnClick",function ()
+										if char.trackerCharacterExpanded[character] then
+											char.trackerCharacterExpanded[character] = false
+											TDL:ReloadTrackingFrame()
+										else
+											char.trackerCharacterExpanded[character] = true
+											TDL:ReloadTrackingFrame()
+										end
+									end)
+		expandButton:Show()
+		local characterHeader = TDL.TrackingFrame:CreateFontString("header"..i,nil,"GameFontNormal")
+		characterHeader:SetText(character)
+		characterHeader:SetPoint("TOPLEFT",TDL.TrackingFrame,"TOPLEFT", 18,-ypos - 4)
+		characterHeader:Show()
+		ypos = ypos+20
+		if (char.trackerCharacterExpanded[character]) then
+			characterTasks = __.select(taskDataBridge:GetAllTasks(), function (i) return i.Character == character end)
+			for i, characterTask in ipairs(characterTasks) do
+
+				local markCompletedButton = CreateFrame("Button",nil,TDL.TrackingFrame)
+				markCompletedButton:RegisterForClicks("LeftButtonUp","RightButtonUp")
+				markCompletedButton:SetBackdrop(tx)
+				markCompletedButton:SetWidth(12)
+				markCompletedButton:SetHeight(12)
+				markCompletedButton:SetAlpha(1)
+				if (characterTask.LastCompleted) then
+					local tx = markCompletedButton:CreateTexture()
+					tx:SetAllPoints(markCompletedButton)
+					tx:SetTexture(TDL_TaskCompleted_Texture,1)
+				end
+				markCompletedButton:SetPoint("TOPLEFT",TDL.TrackingFrame,"TOPLEFT",15,-ypos)
+				markCompletedButton:Show()
+
+				local characterTaskLabel = TDL.TrackingFrame:CreateFontString(character.." task "..i,nil,"GameFontWhiteSmall")
+				characterTaskLabel:SetText("|cffFFFFFF"..characterTask.Description.."|r")
+				characterTaskLabel:SetPoint("TOPLEFT", TDL.TrackingFrame, "TOPLEFT", 25, -ypos)
+				characterTaskLabel:Show()
+
+				local characterTaskLabelButton = CreateFrame("Button",nil,TDL.TrackingFrame)
+				characterTaskLabelButton:RegisterForClicks("LeftButtonUp","RightButtonUp")
+				local tx = characterTaskLabelButton:CreateTexture()
+				tx:SetAllPoints(characterTaskLabelButton)
+				tx:SetTexture(1,1,1,0.1)
+				characterTaskLabelButton:SetHighlightTexture(tx)
+				characterTaskLabelButton:SetWidth(characterTaskLabel:GetStringWidth())
+				characterTaskLabelButton:SetHeight(12)
+				characterTaskLabelButton:SetAlpha(1)
+				characterTaskLabelButton:SetPoint("TOPLEFT",TDL.TrackingFrame,"TOPLEFT",25,-ypos)
+
+				characterTaskLabelButton:SetScript("OnClick", function (_, button)
+																TDL:ToggleTaskCompleted(characterTask)
+																TDL:ReloadTrackingFrame()
+														end)
+
+				characterTaskLabelButton:SetScript("OnEnter", function ()
+															if TDL_Tooltips then
+																TDL_Tooltips:TDL_CreateTaskTooltip(characterTaskLabel, characterTask)
+															end
+														end)
+				characterTaskLabelButton:SetScript("OnLeave", function ()
+															if TDL_Tooltips then
+																QTip:Release(self.tooltip)
+																self.tooltip = nil
+															end
+														end)
+
+				characterTaskLabelButton:Show()
+				ypos = ypos + 12
+			end
+		end
+
+
+	end
 
 	TDL.TrackingFrame:SetHeight(32)
     local xO,yO = char.TrackingFramePos[1], char.TrackingFramePos[2]

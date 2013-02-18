@@ -77,6 +77,23 @@ function requireTask()
 		end
 	end
 
+	function Task:GetExpirationDaysString()
+		local toReturn = ""
+		for i, day in ipairs(self.Days) do
+			if (day) then
+				if (toReturn ~= "") then
+					toReturn = toReturn.." "
+				end
+				toReturn = toReturn..TDL_DayInitials[i]
+			end
+		end
+		return toReturn
+	end
+
+	function Task:GetExpirationTimeString()
+		return string.format("%.2d", self.Hours)..":"..string.format("%.2d", self.Minutes).." "..TDL_AmPmLiterals[self.AmPm]
+	end
+
 	return Task
 
 end

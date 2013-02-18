@@ -19,6 +19,7 @@ function requireTaskDataBridge()
 			[3] = "CENTER"
 		}
 		TDL_Database.char.lockTrackingFrame = false
+		TDL_Database.char.trackerCharacterExpanded = {}
 	end
 
 	local taskDataBridge = {}
