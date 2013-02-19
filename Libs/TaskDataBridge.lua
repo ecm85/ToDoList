@@ -4,22 +4,17 @@ function requireTaskDataBridge()
 	local Task = requireTask()
 
 	local function SetUpDefaultCharValues(TDL_Database)
-		print("Setting up defaults")
-		TDL_Database.char.hasDefaults = true
-		TDL_Database.char.showTrackingFrame = false
-		TDL_Database.char.minimapIcon =
-		{
-			["minimapPos"] = 220,
-			["radius"] = 80
-		}
-		TDL_Database.char.TrackingFramePos =
-		{
-			[1] = 0,
-			[2] = 0,
-			[3] = "CENTER"
-		}
-		TDL_Database.char.lockTrackingFrame = false
-		TDL_Database.char.trackerCharacterExpanded = {}
+		local char = TDL_Database.char
+		char.showTrackingFrame = char.showTrackingFrame or false
+		char.minimapIcon = char.minimapIcon or {}
+		char.minimapIcon.minimapPos = char.minimapIcon.minimapPos or 220
+		char.minimapIcon.radius = char.minimapIcon.radius or 80
+		char.TrackingFramePos = char.TrackingFramePos or {}
+		char.TrackingFramePos[1] = char.TrackingFramePos[1] or 0
+		char.TrackingFramePos[2] = char.TrackingFramePos[2] or 0
+		char.TrackingFramePos[3] = char.TrackingFramePos[3] or "CENTER"
+		char.lockTrackingFrame = char.lockTrackingFrame or false
+		char.trackerCharacterExpanded = char.trackerCharacterExpanded or {}
 	end
 
 	local taskDataBridge = {}
@@ -27,9 +22,7 @@ function requireTaskDataBridge()
 
 	function taskDataBridge.Initialize()
 		TDL_Database = LibStub("AceDB-3.0"):New("ToDoListDB",defaults)
-		if (not TDL_Database.char.hasDefaults) then
-			SetUpDefaultCharValues(TDL_Database)
-		end
+		SetUpDefaultCharValues(TDL_Database)
 		if (not TDL_Database.global.Tasks) then
 			TDL_Database.global.Tasks = {}
 			TDL_Database.global.nextId = 0
