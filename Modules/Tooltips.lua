@@ -30,7 +30,7 @@ end
 function TDL_Tooltips:TDL_CreateTaskTooltip(parent, task)
 	local tooltip = QTip:Acquire("TDLTooltip",2,"LEFT","LEFT")
 	TDL.tooltip = tooltip
-	
+
 	-- Title the tooltip with the quest name
 	tooltip:AddHeader(task.Description)
 	tooltip:AddHeader(task.Character)
@@ -43,6 +43,8 @@ function TDL_Tooltips:TDL_CreateTaskTooltip(parent, task)
 	tooltip:AddLine("Resets:")
 	tooltip:AddLine(task:GetExpirationDaysString())
 	tooltip:AddLine(task:GetExpirationTimeString())
+	tooltip:AddSeparator()
+	tooltip:AddLine("Click to toggle complete/incomplete.")
 
 
 	if parent then
